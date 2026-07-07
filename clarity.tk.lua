@@ -1003,35 +1003,20 @@ local function lll11lllllll()
 		Font = Enum.Font.Code,
 		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
 		Parent = lll111l.main
 	})
-	L_5_:Create("ImageLabel", {
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://2454009026",
-		ImageColor3 = Color3.new(),
-		ImageTransparency = 0.8,
-		Parent = lll111l.listvalue
-	})
-	L_5_:Create("ImageLabel", {
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://2592362371",
-		ImageColor3 = Color3.fromRGB(60, 60, 60),
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(2, 2, 62, 62),
-		Parent = lll111l.listvalue
-	})
-	lll111l.arrow = L_5_:Create("ImageLabel", {
+	
+	local listStroke = Instance.new("UIStroke")
+	listStroke.Color = Color3.fromRGB(60, 60, 60)
+	listStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	listStroke.Parent = lll111l.listvalue
+	
+	lll111l.arrow = L_5_:Create("Frame", {
 		Position = UDim2.new(1, -14, 0, 5),
 		Size = UDim2.new(0, 8, 0, 8),
 		Rotation = 90,
 		BackgroundTransparency = 1,
-		Image = "rbxassetid://4918373417",
-		ImageColor3 = Color3.new(1, 1, 1),
-		ScaleType = Enum.ScaleType.Fit,
-		ImageTransparency = 0.4,
+		Visible = false,
 		Parent = lll111l.listvalue
 	})
 	lll111l.holder = L_5_:Create("TextButton", {
@@ -4236,6 +4221,34 @@ spawn(function()
 		}
 		local L_1246_ = getnamecallmethod()
 		local L_1247_ = llllll11ll1.Name;
+		
+		if L_1247_ == "Hallooooooooooooo" or L_1247_ == "Boogers" then
+			if L_1246_ == "FireServer" or L_1246_ == "FireUnreliable" or L_1246_ == "InvokeServer" then
+				return nil
+			end
+		end
+		if L_1247_ == "ParticleRemote" then
+			if type(L_1245_[1]) == "table" and L_1245_[1][1] == "kick" then
+				return
+			end
+		end
+		if L_1246_ == "FireServer" and L_1247_ == "ApplyGun" then
+			if library_flags["Inf Ammo"] then
+				local ammoTable
+				for _, obj in ipairs(getgc(true)) do
+					if typeof(obj) == "table" and rawget(obj, "ammocount") ~= nil and rawget(obj, "ammocount2") ~= nil and rawget(obj, "ammocount3") ~= nil and rawget(obj, "ammocount4") ~= nil then
+						ammoTable = obj
+						break
+					end
+				end
+				if ammoTable then
+					ammoTable.ammocount = 9e99999
+					ammoTable.ammocount2 = 9e99999
+					ammoTable.ammocount3 = 9e99999
+					ammoTable.ammocount4 = 9e99999
+				end
+			end
+		end
 		if L_1247_ == "ApplyGun" and type(L_1245_[1]) == "table" and L_1245_[1].Name then
 			if string.find(L_1245_[1].Name, "Banana") or string.find(L_1245_[1].Name, "Flip") then
 				local _replacement2 = L_1219_.Weapons[L_1218_.Status.Team.Value .. " Knife"]
@@ -5810,25 +5823,6 @@ spawn(function()
 		end
 	end
 end)
-miscMain:AddToggle({
-	text = "Watermark",
-	callback = function()
-		local enabled = library_flags["Watermark"]
-		if game:GetService("CoreGui"):FindFirstChild("CW_NativeWatermark") then
-			game:GetService("CoreGui").CW_NativeWatermark.Enabled = enabled
-		end
-		pcall(function()
-			local perf = L_32_.PlayerGui:FindFirstChild("Performance")
-			if perf and perf:IsA("ScreenGui") then
-				perf.Enabled = not enabled
-			end
-		end)
-		pcall(function()
-			game:GetService("GuiService"):SetStatsItemEnabled("FPS", not enabled)
-			game:GetService("GuiService"):SetStatsItemEnabled("Ping", not enabled)
-		end)
-	end
-})
 miscOK = L_5_:AddWarning({
 	type = "ok"
 })
@@ -5847,6 +5841,12 @@ miscMovement:AddToggle({
 	text = "Bunny Hop",
 	callback = function()
 	end
+})
+miscMovement:AddList({
+	text = "Bunny Hop Method",
+	flag = "Bunny Hop Method",
+	values = {"Directional", "A/D"},
+	value = "A/D"
 })
 miscMovement:AddSlider({
 	text = "Bunny Hop Speed",
@@ -6329,36 +6329,52 @@ miscMeme:AddToggle({
 }):AddBind({
 	key = Enum.KeyCode.U,
 	mode = "hold",
-	callback = function(b)
-		getgenv().wallclimbBindHeld = not b
-	end
+	callback = function() end
 })
 miscMeme:AddToggle({
 	text = "Texture Bug"
 }):AddBind({
 	key = Enum.KeyCode.K,
 	mode = "hold",
-	callback = function(b)
-		getgenv().textureBugBindHeld = not b
-	end
+	callback = function() end
 })
 miscMeme:AddToggle({
 	text = "Long Jump"
 }):AddBind({
 	key = Enum.KeyCode.Z,
 	mode = "hold",
-	callback = function(l11l1l)
-		if library_flags["Long Jump"] then
-			if not l11l1l then
-				getgenv().longJumpHold = true
-			else
-				getgenv().longJumpHold = false
-			end
-		else
-			getgenv().longJumpHold = false
-		end
-	end
+	callback = function() end
 })
+game:GetService("RunService").RenderStepped:Connect(function()
+	local uis = game:GetService("UserInputService")
+	if not uis:GetFocusedTextBox() then
+		local opt = L_5_.options and L_5_.options["Long Jump"]
+		if opt and opt.key then
+			local st, k = pcall(function() return Enum.KeyCode[opt.key] end)
+			if st and k then 
+				getgenv().longJumpHold = uis:IsKeyDown(k)
+				return
+			end
+		end
+		getgenv().longJumpHold = uis:IsKeyDown(Enum.KeyCode.Z)
+		
+		local wcOpt = L_5_.options and L_5_.options["Wallclimb"]
+		if wcOpt and wcOpt.key then
+			local st, k = pcall(function() return Enum.KeyCode[wcOpt.key] end)
+			if st and k then getgenv().wallclimbBindHeld = uis:IsKeyDown(k) else getgenv().wallclimbBindHeld = uis:IsKeyDown(Enum.KeyCode.U) end
+		else getgenv().wallclimbBindHeld = uis:IsKeyDown(Enum.KeyCode.U) end
+		
+		local tbOpt = L_5_.options and L_5_.options["Texture Bug"]
+		if tbOpt and tbOpt.key then
+			local st, k = pcall(function() return Enum.KeyCode[tbOpt.key] end)
+			if st and k then getgenv().textureBugBindHeld = uis:IsKeyDown(k) else getgenv().textureBugBindHeld = uis:IsKeyDown(Enum.KeyCode.K) end
+		else getgenv().textureBugBindHeld = uis:IsKeyDown(Enum.KeyCode.K) end
+	else
+		getgenv().longJumpHold = false
+		getgenv().wallclimbBindHeld = false
+		getgenv().textureBugBindHeld = false
+	end
+end)
 miscMeme:AddToggle({
 	text = "Jumpbug"
 }):AddBind({
@@ -7126,6 +7142,9 @@ exploitMain:AddToggle({
 })
 exploitMain:AddToggle({
 	text = "Remove Recoil"
+})
+exploitMain:AddToggle({
+	text = "Inf Ammo"
 })
 exploitMain:AddToggle({
 	text = "Remove Spread",
@@ -8800,8 +8819,6 @@ L_menuSec_:AddToggle({
 		end
 	end
 })
-L_menuSec_:AddToggle({text = "clarity discord status", flag = "clarityDiscordStatus", state = true})
-L_menuSec_:AddToggle({text = "hide from obs", flag = "hideFromOBS"})
 local _menuScale
 L_menuSec_:AddList({
 	text = "dpi scaling",
@@ -8818,14 +8835,6 @@ L_menuSec_:AddList({
 		end
 		local map = {["75%"]=0.75, ["100%"]=1, ["125%"]=1.25, ["150%"]=1.5, ["175%"]=1.75, ["200%"]=2}
 		_menuScale.Scale = map[val] or 1
-	end
-})
-L_menuSec_:AddButton({
-	text = "open clarity folder",
-	callback = function()
-		setclipboard(L_5_.foldername)
-		L_133_.text = "Clarity folder path copied to clipboard: " .. tostring(L_5_.foldername)
-		L_133_:Show()
 	end
 })
 local L_safetySec_ = L_128_:AddSection"safety"
@@ -9856,7 +9865,7 @@ L_5_.Init = function(self)
 						elseif d:IsA("BasePart") and not (
 							d.Name:match("Torso") or d.Name:match("Leg") or d.Name:match("Arm") or d.Name:match("Hand")
 							or d.Name:match("Foot") or d.Name == "Head" or d.Name == "HumanoidRootPart"
-							or d.Name == "FakeHead" or d.Name == "Hitbox"
+							or d.Name == "FakeHead" or d.Name == "Hitbox" or d:FindFirstAncestorWhichIsA("Accessory") or d:FindFirstAncestorWhichIsA("Accoutrement")
 						) then
 							d:Destroy()
 						end
@@ -9878,11 +9887,7 @@ L_5_.Init = function(self)
 										if c0 and c1 then
 											local transform = CFrame.new()
 											if d:IsA("Motor6D") then
-												transform = d.Transform
-												local n = d.Name
-												if n == "Root" or n == "Waist" or n == "Neck" or n:match("Hip") or n:match("Knee") or n:match("Ankle") or n:match("Shoulder") or n:match("Elbow") or n:match("Wrist") then
-													transform = CFrame.new()
-												end
+												transform = CFrame.new()
 											end
 											if not resolvedCFrames[p1] and resolvedCFrames[p0] then
 												resolvedCFrames[p1] = resolvedCFrames[p0] * c0 * transform * c1:Inverse()
@@ -9993,7 +9998,7 @@ L_5_.Init = function(self)
 		end
 		previewRotY = 0
 		previewReady = ok
-		cam.CFrame = CFrame.new(Vector3.new(0, 0, -8.5), Vector3.new(0, 0, 0))
+		cam.CFrame = CFrame.new(Vector3.new(0, 2.5, -9.5), Vector3.new(0, 0, 0))
 	end
 	rebuildDummy()
 	spawn(function()
@@ -12254,7 +12259,7 @@ L_5_.Init = function(self)
 							local isLk = library_flags["PlayerLoopKills"][selectedPlayer.Name]
 							priBtn.TextColor3 = isPri and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(180, 180, 180)
 							frnBtn.TextColor3 = isFrn and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(180, 180, 180)
-							lkBtn.TextColor3 = isLk and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(180, 180, 180)
+							lkBtn.TextColor3 = isLk and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(180, 180, 180)
 						end
 						priBtn.MouseButton1Click:Connect(function()
 							if not selectedPlayer then return end
@@ -12320,7 +12325,13 @@ L_5_.Init = function(self)
 										sText = "friendly"
 									end
 									statusL.Text = sText
-									statusL.TextColor3 = sText ~= "none" and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(180, 180, 180)
+									if sText == "loop kill" then
+										statusL.TextColor3 = Color3.fromRGB(255, 0, 0)
+									elseif sText ~= "none" then
+										statusL.TextColor3 = Color3.fromRGB(0, 255, 0)
+									else
+										statusL.TextColor3 = Color3.fromRGB(180, 180, 180)
+									end
 									local alive = true
 									if p.Character and p.Character:FindFirstChild("Humanoid") then
 										alive = p.Character.Humanoid.Health > 0
@@ -13163,13 +13174,13 @@ local function updateEdgeBox(pos, active, color)
 				getgenv().csgoEdgeDetected = false
 			end
 		end
-		local velocity = hrphrp.AssemblyLinearVelocity
+		local velocity = hrp.AssemblyLinearVelocity
 		if getgenv().minijumpActive then
 			if tick() - (getgenv().mjArmedTime or 0) > 1.5 then
 				getgenv().minijumpActive = nil
 			elseif velocity.Y > 2 then
 				local mult = library_flags["mjMult"] or 0.5
-				hrphrp.AssemblyLinearVelocity = Vector3.new(velocity.X, velocity.Y * mult, velocity.Z)
+				hrp.AssemblyLinearVelocity = Vector3.new(velocity.X, velocity.Y * mult, velocity.Z)
 				getgenv().minijumpActive = nil 
 				getgenv().minijumpSuccessTime = tick()
 			end
@@ -13183,7 +13194,7 @@ local function updateEdgeBox(pos, active, color)
 			if velocity.Y > 1 and getgenv().jbWasGrounded and not getgenv().hasBoosted then
 				local boostVal = library_flags["jbheight"] or 3.5
 				local multiplier = 0.8 
-				hrphrp.AssemblyLinearVelocity = Vector3.new(velocity.X, velocity.Y + (boostVal * multiplier), velocity.Z)
+				hrp.AssemblyLinearVelocity = Vector3.new(velocity.X, velocity.Y + (boostVal * multiplier), velocity.Z)
 				getgenv().hasBoosted = true
 				getgenv().jbWasGrounded = false 
 				getgenv().jbTriggerTime = tick() 
@@ -13481,7 +13492,6 @@ local function updateEdgeBox(pos, active, color)
 	end;
 	L_57_ = getWeaponInfo()
 	if library_flags["Bunny Hop"] and L_57_.alive and not L_54_ then
-		library_flags["Bunny Hop Method"] = "Directional 2"
 		local L_1739_ = L_32_.Character and L_32_.Character:FindFirstChild("HumanoidRootPart")
 		local L_1740_ = L_48_;
 		local L_1741_;
@@ -13566,6 +13576,41 @@ local function updateEdgeBox(pos, active, color)
 					end;
 				end
 				last = L_1739_.AssemblyLinearVelocity
+			elseif library_flags["Bunny Hop Method"] == "A/D" then
+				local currentVel = L_1739_.AssemblyLinearVelocity
+				local flatVel = Vector3.new(currentVel.X, 0, currentVel.Z)
+				
+				local camCF = L_34_.CFrame
+				local look = camCF.LookVector
+				local right = camCF.RightVector
+				local flatLook = Vector3.new(look.X, 0, look.Z).Unit
+				local flatRight = Vector3.new(right.X, 0, right.Z).Unit
+				
+				local baseSpeed = library_flags["Speed Value"] or 50
+				local speed = math.max(flatVel.Magnitude, baseSpeed)
+				
+				local moveDir = flatLook
+				if L_25_:IsKeyDown(Enum.KeyCode.W) then moveDir = flatLook end
+				if L_25_:IsKeyDown(Enum.KeyCode.S) then moveDir = -flatLook end
+				
+				local currentDir = flatVel.Magnitude > 1 and flatVel.Unit or moveDir
+				
+				local turnRate = 0.08
+				if L_25_:IsKeyDown(Enum.KeyCode.A) then
+					currentDir = (currentDir - flatRight * turnRate).Unit
+					speed = speed + 0.5
+				end
+				if L_25_:IsKeyDown(Enum.KeyCode.D) then
+					currentDir = (currentDir + flatRight * turnRate).Unit
+					speed = speed + 0.5
+				end
+				
+				if speed > (baseSpeed * 2) then speed = baseSpeed * 2 end
+				
+				local newVel = currentDir * speed
+				L_1739_.AssemblyLinearVelocity = Vector3.new(newVel.X, currentVel.Y, newVel.Z)
+				L_32_.Character.Humanoid.Jump = true
+				last = L_1739_.AssemblyLinearVelocity
 			elseif library_flags["Bunny Hop Method"] == "Directional" or library_flags["Bunny Hop Method"] == "Directional 2" or library_flags["Bunny Hop Method"] == "Gyro" then
 				local add = 0
 				local keyHeld = false
@@ -13580,7 +13625,7 @@ local function updateEdgeBox(pos, active, color)
 					if L_25_:IsKeyDown(Enum.KeyCode.A) and L_25_:IsKeyDown(Enum.KeyCode.S) then add = 145 end
 				end
 				L_32_.Character.Humanoid.Jump = true
-				if not strafing and (not keyHeld and library_flags["Bunny Hop Method"] == "Directional") then
+				if not strafing and (not keyHeld and library_flags["Bunny Hop Method"] == "Directional_OLD") then
 				elseif not strafing then
 					local camCF = L_34_.CFrame
 					local _, camY, _ = camCF:ToOrientation()
@@ -13588,7 +13633,7 @@ local function updateEdgeBox(pos, active, color)
 					local currentFlatSpeed = Vector3.new(L_1739_.AssemblyLinearVelocity.X, 0, L_1739_.AssemblyLinearVelocity.Z).Magnitude
 					local appliedSpeed = math.max(currentFlatSpeed, L_1743_)
 					if not surfing and not (library_flags["Wallclimb"] and getgenv().wallclimbTouching) and not getgenv().pixelSurfTouching then
-						if library_flags["Bunny Hop Method"] == "Gyro" or (library_flags["Bunny Hop Method"] == "Directional 2" and keyHeld) then
+						if library_flags["Bunny Hop Method"] == "Gyro" or (library_flags["Bunny Hop Method"] == "Directional" and keyHeld) then
 							if not getgenv().bhopGyro or not pcall(function() return getgenv().bhopGyro.Parent end) then
 								getgenv().bhopGyro = Instance.new("BodyVelocity")
 								getgenv().bhopGyro.Parent = L_32_.Character:FindFirstChild("UpperTorso") or L_1739_
@@ -13605,7 +13650,7 @@ local function updateEdgeBox(pos, active, color)
 								end
 							end)
 						else
-							if getgenv().bhopGyro and library_flags["Bunny Hop Method"] == "Directional 2" then
+							if getgenv().bhopGyro and library_flags["Bunny Hop Method"] == "Directional" then
 								pcall(function() getgenv().bhopGyro:Destroy() end)
 								getgenv().bhopGyro = nil
 							end
@@ -13617,7 +13662,7 @@ local function updateEdgeBox(pos, active, color)
 					        getgenv().bhopGyro = nil
 					    end
 					end
-				end
+				end 
 				last = L_1739_.AssemblyLinearVelocity
 			end;
 			L_32_.Character.Humanoid.Jump = true
@@ -13653,6 +13698,7 @@ local function updateEdgeBox(pos, active, color)
 		end
 		if library_flags["Wallclimb"] and getgenv().wallclimbBindHeld then
 			local hum = L_32_.Character and L_32_.Character:FindFirstChild("Humanoid")
+			local hrp = L_32_.Character and L_32_.Character:FindFirstChild("HumanoidRootPart")
 			if hrp and hum then
 				local wallPart, _, _ = findWallHit()
 				getgenv().wallclimbTouching = wallPart ~= nil
@@ -13736,13 +13782,20 @@ local function updateEdgeBox(pos, active, color)
 	if library_flags["Long Jump"] and L_57_.alive then
 		local hrp = L_32_.Character and L_32_.Character:FindFirstChild("HumanoidRootPart")
 		local hum = L_32_.Character and L_32_.Character:FindFirstChild("Humanoid")
-		if hrp and hum and L_25_:IsKeyDown(Enum.KeyCode.Z) then
+		if hrp and hum and getgenv().longJumpHold then
 			local state = hum:GetState()
-			if state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Jumping then
+			local inAir = (state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Jumping or hum.FloorMaterial == Enum.Material.Air)
+			if inAir then
 				local ljStuds = library_flags["longJumpStuds"] or 30
 				local dir = hum.MoveDirection
+				if dir.Magnitude == 0 then
+					local flatVel = Vector3.new(hrp.AssemblyLinearVelocity.X, 0, hrp.AssemblyLinearVelocity.Z)
+					if flatVel.Magnitude > 0.1 then
+						dir = flatVel.Unit
+					end
+				end
 				if dir.Magnitude > 0 then
-					hrphrp.AssemblyLinearVelocity = Vector3.new(dir.X * ljStuds * 4, hrphrp.AssemblyLinearVelocity.Y, dir.Z * ljStuds * 4)
+					hrp.AssemblyLinearVelocity = Vector3.new(dir.X * ljStuds * 4, hrp.AssemblyLinearVelocity.Y, dir.Z * ljStuds * 4)
 					getgenv().lastLongJumpTime = tick()
 				end
 			end
