@@ -1,3 +1,8 @@
+--[[
+    Copyright (C) 2026 Freezewo
+    Licensed under the GNU AGPLv3 License.
+    Official Repository: https://github.com/Freezewo/clarity.tk
+--]]
 local env = getgenv(); val_635 = true
 
 
