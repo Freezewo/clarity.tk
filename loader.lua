@@ -155,6 +155,10 @@ local gameConfigs = {
         placeIds = {90184287580174},
         url = "https://raw.githubusercontent.com/Freezewo/PoopHook/main/poophook.lua"
     },
+    ["blox strike"] = {
+        placeIds = {114234929420007},
+        url = "https://raw.githubusercontent.com/Freezewo/clarity.tk-BS/main/secret.lua"
+    },
     ["arsenal"] = {
         placeIds = {286090429},
         url = "https://raw.githubusercontent.com/Freezewo/awarehook/main/awarehook.lua"
@@ -173,7 +177,7 @@ for gameName, config in gameConfigs do
     end
 end
 
-local games = {"killstreak", "counter blox", "arsenal"}
+local games = {"killstreak", "counter blox", "blox strike", "arsenal"}
 local gameButtons = {}
 
 for _, gameName in games do
@@ -253,7 +257,41 @@ injectBtn.MouseButton1Click:Connect(function()
     injectBtn.Text = "loading..."
     injectBtn.TextColor3 = Color3.fromRGB(80, 220, 50)
 
-    task.wait(0.5)
+    if selectedGame == "blox strike" or game.PlaceId == 114234929420007 then
+        pcall(function()
+            if debug and debug.info and hookfunction then
+                local old_debug_info
+                old_debug_info = hookfunction(debug.info, newcclosure(function(lvl_or_func, ...)
+                    if type(lvl_or_func) == "number" then
+                        local ok, a, b, c, d, e = pcall(old_debug_info, lvl_or_func, ...)
+                        if ok then return a, b, c, d, e end
+                        return ""
+                    end
+                    return old_debug_info(lvl_or_func, ...)
+                end))
+            end
+
+            if string and string.lower and hookfunction then
+                local old_string_lower
+                old_string_lower = hookfunction(string.lower, newcclosure(function(str, ...)
+                    if type(str) ~= "string" then return "" end
+                    return old_string_lower(str, ...)
+                end))
+            end
+
+            if getfenv and hookfunction then
+                local old_getfenv
+                old_getfenv = hookfunction(getfenv, newcclosure(function(lvl_or_func, ...)
+                    if type(lvl_or_func) == "number" then
+                        local ok, env = pcall(old_getfenv, lvl_or_func, ...)
+                        if ok then return env end
+                        return old_getfenv(1)
+                    end
+                    return old_getfenv(lvl_or_func or 1, ...)
+                end))
+            end
+        end)
+    end
 
     loadstring(game:HttpGet(config.url))()
 
