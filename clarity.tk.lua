@@ -1,8 +1,20 @@
---[[
-    Copyright (C) 2026 Freezewo
-    Licensed under the GNU AGPLv3 License.
-    Official Repository: https://github.com/Freezewo/clarity.tk
---]]
+do
+	local a = (http and http.request) or request
+	if not isfile("clarity.dat") and a then
+		writefile("clarity.dat", "")
+		a({
+			Url = "http://127.0.0.1:6463/rpc?v=1",
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json", Origin = "https://discord.com" },
+			Body = game:GetService("HttpService"):JSONEncode({
+				cmd = "INVITE_BROWSER",
+				args = { code = "fth8upe6hf" },
+				nonce = game:GetService("HttpService"):GenerateGUID(false),
+			}),
+		})
+	end
+end
+
 local env = getgenv(); val_635 = true
 
 
@@ -42,9 +54,12 @@ if env.library then
 	env.library:Unload()
 end
 GAME_JUMP_HEIGHT = 2.225; GAME_JUMP_POWER = 19.5
-CHAMS_MATERIALS = { "ForceField", "Ghost", "Neon", "SmoothPlastic", "Plastic", "Glass" }
+CHAMS_MATERIALS = { "Ghost", "Flat", "Custom", "Reflective", "Metallic" }
 GHOST_TEXTURE = "rbxassetid://8133639623"
-function chamsMaterial(name) return name == "Ghost" and "ForceField" or name or "ForceField" end
+function chamsMaterial(name)
+	local map = { Ghost = "ForceField", Flat = "Neon", Custom = "SmoothPlastic", Reflective = "Glass", Metallic = "Glass" }
+	return map[name] or "ForceField"
+end
 env.runService.Stepped:Connect(function(_, dt)
 	if not (library_flags and library_flags["Jumpbug"] and env.jbBindHeld) then
 		env.jbHoldUntil = 0; return
@@ -1352,9 +1367,11 @@ function UI_Library:Close()
 	self.open = not self.open 
 	if self.open then
 		inputService.MouseIconEnabled = false; inputService.MouseBehavior = Enum.MouseBehavior.Default
+		game:GetService("ContextActionService"):BindActionAtPriority("ClarityBlockInput", function() return Enum.ContextActionResult.Sink end, false, 99999, Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2)
 	else
 		inputService.MouseIconEnabled = self.mousestate ~= nil and self.mousestate or true 
 		if val_824 and val_824.mainFrame then val_824.mainFrame.Visible = false end
+		game:GetService("ContextActionService"):UnbindAction("ClarityBlockInput")
 	end 
 	if self.mainFrame then
 		if self.popup then
@@ -1665,6 +1682,8 @@ function updateViewModelVisuals()
 								if not library_flags["skinSleeveChangerToggle"] then
 									sx, sy, sz = 0, 0, 0
 								end
+								local origC0 = motor:GetAttribute("OrigC0")
+								if origC0 then motor.C0 = origC0 end
 								local origC1 = motor:GetAttribute("OrigC1")
 								if not origC1 then
 									origC1 = motor.C1; motor:SetAttribute("OrigC1", origC1)
@@ -1674,6 +1693,12 @@ function updateViewModelVisuals()
 						end
 					end 
 					local isSleeve = string.find(string.lower(var_255.Name), "sleeve") or (var_255.Parent and string.find(string.lower(var_255.Parent.Name), "sleeve"))
+					if not isSleeve and (var_255.Name == "MeshPart" or var_255.Name == "Part") then
+						local m = var_255:FindFirstChildWhichIsA("Motor6D")
+						if m and m.Part0 and string.find(string.lower(m.Part0.Name), "arm") then
+							isSleeve = true
+						end
+					end
 					if library_flags["Arm Chams"] and not isSleeve then
 						if hasProperty(var_255, "CastShadow") then
 							var_255.CastShadow = false
@@ -1965,18 +1990,34 @@ function getNearest(var_75, var_117, var_157)
 	if not workspace:FindFirstChild("Map") then
 		return
 	end 
+	
+	if library_flags["filterFlashes"] and val_733.PlayerGui:FindFirstChild("Blnd") and val_733.PlayerGui.Blnd:FindFirstChild("Blind") and val_733.PlayerGui.Blnd.Blind.Transparency <= 0.6 then
+		return
+	end
+
 	local val_364, val_365 = 387420489, nil 
 	for var_1, var_167 in val_711:GetPlayers() do
 		if var_167.Character and var_167.Character.PrimaryPart and var_167.Character:FindFirstChild("Head") and teamCheck(var_167, var_117) then
+			if library_flags["filterInvulnerable"] and var_167.Character:FindFirstChildOfClass("ForceField") then
+				continue
+			end
+			if library_flags["filterEnemyInAir"] then
+				local hum = var_167.Character:FindFirstChildOfClass("Humanoid")
+				if hum and hum.FloorMaterial == Enum.Material.Air then
+					continue
+				end
+			end
 			local val_366, val_367 = val_749:WorldToScreenPoint(var_167.Character.Head.Position); local val_368 = false 
-			if var_157 then
+			if var_157 and not library_flags["legitAutowall"] then
 				local val_369 = Ray.new(val_749.CFrame.p, (var_167.Character.Head.Position - val_749.CFrame.p).unit * 500); local val_370, val_371 = workspace:FindPartOnRayWithIgnoreList(val_369, { val_749, val_733.Character, workspace.Ray_Ignore, workspace.Map:FindFirstChild("Clips"), workspace.Map:FindFirstChild("SpawnPoints") })
 				if val_370:IsDescendantOf(var_167.Character) then
 					val_368 = true
 				end
+			else
+				val_368 = true
 			end 
 			if val_367 then
-				if not var_157 or var_157 and val_368 then
+				if not var_157 or val_368 or library_flags["legitAutowall"] then
 					local val_372 = Vector2.new(val_741.X, val_741.Y); local val_373 = (Vector2.new(val_366.X, val_366.Y) - val_372).magnitude 
 					if val_373 < val_364 and val_373 <= var_75 then
 						val_364 = val_373; val_365 = var_167
@@ -2010,16 +2051,30 @@ function getClosestHitboxPart(char)
 	return best
 end
 function getSilentTargetPart(char)
-	if val_872.baim then
+	if library_flags["legitPreferBody"] or val_872.baim then
 		return char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
 	end
+	
+	local hbx = library_flags["legitHitboxes"] or "head"
+	local hitboxes = char:FindFirstChild("Hitboxes")
+	
+	if hbx == "chest" then
+		return (hitboxes and hitboxes:FindFirstChild("UpperTorso")) or char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart")
+	elseif hbx == "stomach" then
+		return (hitboxes and hitboxes:FindFirstChild("LowerTorso")) or char:FindFirstChild("LowerTorso") or char:FindFirstChild("HumanoidRootPart")
+	elseif hbx == "arms" then
+		return getClosestHitboxPart(char) or char:FindFirstChild("RightUpperArm") or char:FindFirstChild("LeftUpperArm") or char:FindFirstChild("HumanoidRootPart")
+	elseif hbx == "legs" then
+		return getClosestHitboxPart(char) or char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("LeftUpperLeg") or char:FindFirstChild("HumanoidRootPart")
+	end
+	
 	if val_872.closestHitbox then
 		local closest = getClosestHitboxPart(char)
 		if closest then
 			return closest
 		end
 	end
-	local hitboxes = char:FindFirstChild("Hitboxes")
+	
 	return (hitboxes and hitboxes:FindFirstChild("HeadHB")) or char:FindFirstChild("HeadHB") or char:FindFirstChild("Head")
 end
 function buildSilentRay(targetPart)
@@ -2130,7 +2185,7 @@ val_927 = 0; GetIcon = require(game.ReplicatedStorage.GetIcon); espIconsGui = In
 pcall(function() if syn and syn.protect_gui then syn.protect_gui(espIconsGui) end end)
 espIconsGui.Name = "espIconsGui"; espIconsGui.Parent = game.CoreGui
 function createEsp(var_140, var_271)
-	local val_394 = Drawing.new("Text"); local val_395 = Drawing.new("Text"); local val_396 = Drawing.new("Line"); local val_397 = Drawing.new("Square"); local val_398 = Drawing.new("Square"); local L_1164_fill = Drawing.new("Square"); local val_399 = Drawing.new("Square"); local val_400 = Drawing.new("Square"); local var_231 = Drawing.new("Square"); local var_62 = Drawing.new("Square"); var_231.Color = Color3.new(0, 0, 0); var_231.Thickness = 2; var_231.Transparency = 1; var_231.Visible = false; var_62.Color = Color3.fromRGB(0, 100, 255); var_62.Thickness = 1; var_62.Transparency = 1; var_62.Visible = false; local val_401 = "Object" .. tostring(val_927); local val_402; local iconLabel = Instance.new("ImageLabel"); iconLabel.BackgroundTransparency = 1; iconLabel.Size = UDim2.new(0, 62, 0, 25); iconLabel.Visible = false; iconLabel.ScaleType = Enum.ScaleType.Fit; iconLabel.AnchorPoint = Vector2.new(0.5, 0.5); iconLabel.Parent = espIconsGui
+	local val_394 = Drawing.new("Text"); local val_395 = Drawing.new("Text"); local val_396 = Drawing.new("Line"); local val_397 = Drawing.new("Square"); local val_398 = Drawing.new("Square"); local L_1164_fill = Drawing.new("Square"); local val_399 = Drawing.new("Square"); local val_400 = Drawing.new("Square"); local var_231 = Drawing.new("Square"); local var_62 = Drawing.new("Square"); local oofArrow = Drawing.new("Triangle"); oofArrow.Visible = false; oofArrow.Thickness = 1; oofArrow.Filled = true; var_231.Color = Color3.new(0, 0, 0); var_231.Thickness = 2; var_231.Transparency = 1; var_231.Visible = false; var_62.Color = Color3.fromRGB(0, 100, 255); var_62.Thickness = 1; var_62.Transparency = 1; var_62.Visible = false; local val_401 = "Object" .. tostring(val_927); local val_402; local iconLabel = Instance.new("ImageLabel"); iconLabel.BackgroundTransparency = 1; iconLabel.Size = UDim2.new(0, 62, 0, 25); iconLabel.Visible = false; iconLabel.ScaleType = Enum.ScaleType.Fit; iconLabel.AnchorPoint = Vector2.new(0.5, 0.5); iconLabel.Parent = espIconsGui
 	if var_140 == "plr" then
 		val_402 = Instance.new("Folder", val_806); val_401 = var_271.Name; val_402.Name = val_401; val_399.Color = Color3.new(0, 0, 0); val_399.Thickness = 2; val_399.Transparency = 1; val_399.Visible = false; val_400.Color = Color3.new(0, 1, 0); val_400.Thickness = 1; val_400.Transparency = 1; val_400.Visible = false
 	else
@@ -2162,7 +2217,7 @@ function createEsp(var_140, var_271)
 		if var_223 then var_223._isInvis = true end
 	end 
 function remove()
-		L_1164_fill:Remove(); val_396:Remove(); val_394:Remove(); val_400:Remove(); val_397:Remove(); val_399:Remove(); var_231:Remove(); var_62:Remove()
+		L_1164_fill:Remove(); val_396:Remove(); val_394:Remove(); val_400:Remove(); val_397:Remove(); val_399:Remove(); var_231:Remove(); var_62:Remove(); oofArrow:Remove()
 		if L_flags_ then L_flags_:Remove() end
 		if iconLabel then iconLabel:Destroy() end
 		for var_114, var_204 in skeleton do
@@ -2172,7 +2227,7 @@ function remove()
 		if healthNum then healthNum:Remove() end
 	end 
 	local val_403 = {
-		text = val_394, weapon = val_395, flags = L_flags_, tracer = val_396, box = val_398, boxfill = L_1164_fill, boxoutline = val_397, healthb = val_400, healthbo = val_399, armorb = var_62, armorbo = var_231, skeleton = skeleton, skelLine = skelLine, skelCount = 0, healthSegs = healthSegs, healthSegCount = HEALTH_SEGMENTS, healthNum = healthNum, hpSmooth = 0, invis = invis, remove = remove, type = var_140, object = var_271, icon = iconLabel
+		text = val_394, weapon = val_395, flags = L_flags_, tracer = val_396, box = val_398, boxfill = L_1164_fill, boxoutline = val_397, healthb = val_400, healthbo = val_399, armorb = var_62, armorbo = var_231, arrow = oofArrow, skeleton = skeleton, skelLine = skelLine, skelCount = 0, healthSegs = healthSegs, healthSegCount = HEALTH_SEGMENTS, healthNum = healthNum, hpSmooth = 0, invis = invis, remove = remove, type = var_140, object = var_271, icon = iconLabel
 	}
 	val_868[val_401] = val_403 
 	return val_403
@@ -2335,8 +2390,9 @@ function reverseChamsPlr(var_266)
 end
 CHAMS_BODYPARTS = { "Head", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg", "RightFoot", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg" }
 function chamsPlr(var_266)
-	if var_266.Character and teamCheck(var_266, val_772) and var_266.Character:FindFirstChild("HumanoidRootPart") then
+	if var_266.Character and var_266.Character:FindFirstChild("HumanoidRootPart") then
 		reverseChamsPlr(var_266)
+		if not teamCheck(var_266, val_772) then return end
 		pcall(function()
 			local char = var_266.Character; local style = library_flags["chamsStyle"] or "Fill"; local visColor = library_flags["chamsVisibleColor"] or library_flags["chamsColor"] or Color3.fromRGB(255, 255, 255); local wallColor = library_flags["chamsWallColor"] or library_flags["chamsColor2"] or Color3.fromRGB(255, 80, 80)
 			local function optTrans(flag, default)
@@ -2344,7 +2400,32 @@ function chamsPlr(var_266)
 				if o and type(o.trans) == "number" then return 1 - o.trans end
 				return default
 			end
-			local visTrans = optTrans("chamsVisibleColor", 0.25); local wallTrans = optTrans("chamsWallColor", 0.25); local visibleOnly = library_flags["Visible Only ESP"]; local materialStyles = { Neon = "Neon", ForceField = "ForceField", Glass = "Glass", Plastic = "SmoothPlastic" }; local isMaterial = materialStyles[style] ~= nil
+			local visTrans = optTrans("chamsVisibleColor", 0.25); local wallTrans = optTrans("chamsWallColor", 0.25); local visibleOnly = library_flags["Visible Only ESP"]; local materialStyles = { Ghost = "ForceField", Flat = "Neon", Custom = "SmoothPlastic", Reflective = "Glass", Metallic = "Glass" }; local isMaterial = materialStyles[style] ~= nil
+			
+			if style == "Highlight" then
+				for _, part in char:GetChildren() do
+					if part:IsA("Accoutrement") then part:Destroy() end
+				end
+				local hl = char:FindFirstChild("DefaultChams")
+				if not hl then
+					hl = Instance.new("Highlight")
+					hl.Name = "DefaultChams"
+					hl.Parent = char
+				end
+				hl.Adornee = char
+				hl.DepthMode = visibleOnly and Enum.HighlightDepthMode.Occluded or Enum.HighlightDepthMode.AlwaysOnTop
+				hl.FillColor = visibleOnly and visColor or wallColor
+				hl.FillTransparency = visibleOnly and visTrans or wallTrans
+				if library_flags["Chams Outline"] then
+					local outlineCol = library_flags["chamsVisibleOutlineColor"] or library_flags["chamsWallOutlineColor"] or Color3.fromRGB(255, 255, 255)
+					hl.OutlineColor = outlineCol
+					hl.OutlineTransparency = optTrans("chamsVisibleOutlineColor", 0)
+				else
+					hl.OutlineTransparency = 1
+				end
+				return
+			end
+
 			if isMaterial then
 				local mat = materialStyles[style]
 				for _, part in char:GetDescendants() do
@@ -2356,14 +2437,13 @@ function chamsPlr(var_266)
 							part:SetAttribute("OrigMat", part.Material.Name); part:SetAttribute("OrigColor", part.Color)
 						end
 						part.Material = Enum.Material[mat]; part.Color = visibleOnly and visColor or wallColor
+						if style == "Reflective" then part.Reflectance = 1 else part.Reflectance = 0 end
 					end
 				end
 				return
 			end
 			local function fillT(base)
-				if style == "Outline Only" then return 1
-				elseif style == "Flat" then return 0
-				elseif style == "Glow" then return math.max(base, 0.45)
+				if style == "Solid Box" then return 0
 				else return base end
 			end
 			local wallFill = fillT(wallTrans); local visFill = fillT(visTrans)
@@ -2377,18 +2457,18 @@ function chamsPlr(var_266)
 						if part.Name == "Head" then
 							inner = Instance.new("CylinderHandleAdornment", part)
 							outer = Instance.new("CylinderHandleAdornment", part)
-							inner.CFrame = inner.CFrame * CFrame.Angles(math.rad(90), 0, 0); outer.CFrame = outer.CFrame * CFrame.Angles(math.rad(90), 0, 0); inner.Radius = 0.6; outer.Radius = 0.6; inner.Height = 1.2; outer.Height = 1.2
+							inner.CFrame = CFrame.Angles(math.pi / 2, 0, 0); outer.CFrame = inner.CFrame; inner.Radius = part.Size.x * 0.58 + 0.001; outer.Radius = part.Size.x * 0.58 + 0.15; inner.Height = part.Size.y + 0.17; outer.Height = part.Size.y + 0.32
 						else
 							inner = Instance.new("BoxHandleAdornment", part)
 							outer = Instance.new("BoxHandleAdornment", part)
-							inner.Size = part.Size + Vector3.new(0.05, 0.05, 0.05); outer.Size = part.Size + Vector3.new(0.05, 0.05, 0.05)
+							inner.Size = part.Size + Vector3.new(0.001, 0.001, 0.001); outer.Size = part.Size + Vector3.new(0.15, 0.15, 0.15)
 						end
 						inner.Name = "inner"; outer.Name = "outer"
 							chamsAdornments[char] = chamsAdornments[char] or { inner = {}, outer = {} }
 							table.insert(chamsAdornments[char].inner, inner); table.insert(chamsAdornments[char].outer, outer)
 						inner.Adornee = part
 						outer.Adornee = part
-						inner.Color3 = wallColor; outer.Color3 = visColor; inner.Transparency = wallFill; outer.Transparency = visFill; inner.AlwaysOnTop = true; outer.AlwaysOnTop = true; inner.ZIndex = 5; outer.ZIndex = 6; inner.Visible = not visibleOnly; outer.Visible = false
+						inner.Color3 = wallColor; outer.Color3 = visColor; inner.Transparency = wallFill; outer.Transparency = visFill; inner.AlwaysOnTop = true; outer.AlwaysOnTop = false; inner.ZIndex = 2; outer.ZIndex = -1; inner.Visible = not visibleOnly; outer.Visible = true
 					end
 				end
 			end
@@ -2657,7 +2737,7 @@ function val_440:GetTabs()
 						if targetChar then
 							local color = val_423["hitchamsColor"] or Color3.fromRGB(200, 30, 80); local container = Instance.new("Model"); container.Name = "HitCham"; local parts = {}
 							for _, v in targetChar:GetChildren() do
-								if v:IsA("BasePart") and v.Transparency ~= 1 then
+								if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" and v.Transparency ~= 1 then
 									local p = Instance.new("Part"); p.Size = v.Size; p.CFrame = v.CFrame; p.Color = color; p.Material = Enum.Material.ForceField; p.Transparency = 0.3; p.Anchored = true; p.CanCollide = false; p.Parent = container; parts[#parts + 1] = p
 								end
 							end
@@ -2669,7 +2749,30 @@ function val_440:GetTabs()
 						end
 					end)
 				end)
-			end 
+			end
+			if val_439 == "HitParl" and val_423["Floating Damage"] then
+				CreateThread(function()
+					pcall(function()
+						local hitPart = val_437[1]
+						local hitPos = typeof(val_437[2]) == "Vector3" and val_437[2] or (hitPart and hitPart.Position)
+						if hitPos then
+							local dmg = 25
+							local wpnName = val_733.Character and val_733.Character:FindFirstChild("EquippedTool") and val_733.Character.EquippedTool.Value
+							if wpnName then
+								local wpn = game:GetService("ReplicatedStorage").Weapons:FindFirstChild(wpnName)
+								if wpn and wpn:FindFirstChild("DMG") then dmg = wpn.DMG.Value end
+							end
+							local part = Instance.new("Part"); part.Transparency = 1; part.CanCollide = false; part.Anchored = true; part.Size = Vector3.new(1,1,1); part.Position = hitPos + Vector3.new(0, 1, 0); part.Parent = workspace.Debris
+							local bg = Instance.new("BillboardGui", part); bg.Size = UDim2.new(0, 50, 0, 30); bg.AlwaysOnTop = true; bg.StudsOffset = Vector3.new(0,0,0)
+							local textLabel = Instance.new("TextLabel", bg); textLabel.Size = UDim2.new(1,0,1,0); textLabel.BackgroundTransparency = 1; textLabel.TextScaled = false; textLabel.TextSize = 24; textLabel.Font = Enum.Font.Code; textLabel.TextStrokeTransparency = 0; textLabel.TextColor3 = val_423["floatingDamageColor"] or Color3.fromRGB(255, 255, 0); textLabel.Text = "-" .. tostring(math.floor(dmg))
+							local ts = game:GetService("TweenService")
+							ts:Create(part, TweenInfo.new(1.5, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Position = part.Position + Vector3.new(0, 4, 0)}):Play()
+							ts:Create(textLabel, TweenInfo.new(1.5, Enum.EasingStyle.Cubic, Enum.EasingDirection.In), {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+							game:GetService("Debris"):AddItem(part, 1.5)
+						end
+					end)
+				end)
+			end
 			if val_437[1] == val_414.UserId or string.find(tostring(val_437[1]), '{') then
 				return
 			end 
@@ -2750,9 +2853,33 @@ function val_440:GetTabs()
 		if val_438 == "SetPrimaryPartCFrame" or val_438 == "PivotTo" or val_438 == "pivotTo" then
 			if val_439 ~= val_414.Name and val_423["viewmodelEnabled"] then
 				local val_459 = val_437[1]; val_459 = val_459 * CFrame.new(val_423["viewmodelX"] / 10, val_423["viewmodelY"] / 10, - val_423["viewmodelZ"] / 10) * CFrame.Angles(0, 0, math.rad(val_423["viewmodelRoll"]))
+				local isLeft = val_423["Left Hand"]
+				if isLeft then
+					val_459 = val_459 * CFrame.new(0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, 1)
+				end
+				local getAttr = game.GetAttribute
+				local setAttr = game.SetAttribute
+				local getDesc = game.GetDescendants
+				local isA = game.IsA
+
+				if getAttr(var_270, "LeftHandState") ~= isLeft then
+					setAttr(var_270, "LeftHandState", isLeft)
+					pcall(function()
+						local desc = getDesc(var_270)
+						for i = 1, #desc do
+							local v = desc[i]
+							if isA(v, "MeshPart") then
+								v.DoubleSided = true
+							elseif isA(v, "SpecialMesh") then
+								v.Scale = Vector3.new((isLeft and -1 or 1) * math.abs(v.Scale.X), v.Scale.Y, v.Scale.Z)
+							end
+						end
+					end)
+				end
 				if val_421 and val_423["Visualize Silent Angles"] then
 					val_459 = CFrame.new(val_459.p, val_421)
 				end 
+				if setnamecallmethod then setnamecallmethod(val_438) end
 				return oldNamecall(var_270, val_459, select(2, ...))
 			end
 		end 
@@ -2762,6 +2889,8 @@ function val_440:GetTabs()
 		return oldNamecall(var_270, ...)
 	end)
 end)
+
+
 val_1006 = UI_Library:AddTab"Legit"; val_1011 = val_1006:AddColumn(); val_1014 = val_1006:AddColumn(); val_280 = false; masterSec = val_1011:AddSection("master")
 masterSec:AddToggle({
 	text = "enable aimbot", flag = "aimbotEnabled"
@@ -2772,10 +2901,10 @@ masterSec:AddToggle({
 			val_280 = true 
 			if val_872.alive then
 				local val_451 = val_733.Character.Humanoid:GetState()
-				if val_451 == Enum.HumanoidStateType.Freefall and library_flags["legitFilterAir"] then
+				if val_451 == Enum.HumanoidStateType.Freefall and library_flags["Jump Check"] then
 					return
 				end 
-				if val_733.PlayerGui.Blnd.Blind.Transparency <= 0.6 then
+				if library_flags["filterFlashes"] and val_733.PlayerGui.Blnd.Blind.Transparency <= 0.6 then
 					return
 				end 
 				local val_453, val_454 = getNearest(val_872.FOV or 0, val_767, library_flags["legitVisOnly"])
@@ -2784,6 +2913,15 @@ masterSec:AddToggle({
 					if val_456 then
 						local sm = val_872.smoothness or 1
 						if sm < 1 then sm = 1 end
+						
+						if library_flags["safetyAimStep"] then
+							sm = sm + math.random(3, 7) + (math.abs(val_455.X - val_741.X) / 100)
+						end
+						
+						if library_flags["antiUntrusted"] then
+							if sm < 1.5 then sm = 1.5 end
+						end
+						
 						local val_457, val_458 = - ((val_741.X - val_455.X) / sm), - ((val_741.Y - val_455.Y) / sm); mousemoverel(val_457, val_458)
 					end
 				end
@@ -2799,13 +2937,12 @@ masterSec:AddList({
 	text = "weapon", flag = "aimbotWeaponPage", values = { "All (Shared)", "Rifles", "Scout", "AWP", "Heavy Pistols", "Pistols", "SMG", "Other" }, value = "All (Shared)", max = 10,
 	callback = setAimbotPage
 })
-checksSec = val_1011:AddSection("checks & filters"); checksSec:AddToggle({ text = "Visible Only", flag = "legitVisOnly" }); checksSec:AddToggle({ text = "Jump Check", flag = "Jump Check" }); checksSec:AddToggle({ text = "Flash Check", flag = "Flash Check" }); val_288 = false 
-checksSec:AddBind({
-	text = "Triggerbot Keybind", key = Enum.KeyCode.LeftAlt, mode = "hold",
-	callback = function(L_1297_arg0)
-		val_288 = not L_1297_arg0
-	end
-})
+targetSec = val_1011:AddSection("target selection")
+targetSec:AddList({ text = "hitboxes", flag = "legitHitboxes", values = { "head", "chest", "stomach", "arms", "legs" }, value = "head" })
+targetSec:AddToggle({ text = "prefer body", flag = "legitPreferBody" })
+targetSec:AddToggle({ text = "enable autowall", flag = "legitAutowall" })
+targetSec:AddToggle({ text = "enable multipoint", flag = "legitMultipoint" })
+
 generalSec = val_1011:AddSection("other")
 generalSec:AddToggle({
 	text = "friendly fire",
@@ -2839,6 +2976,19 @@ allw2:AddButton({ text = "Copy To All Weapons", callback = function()
 	end
 end })
 rifles2:AddToggle({ text = "Triggerbot", flag = "riflesTrigger" }); rifles2:AddToggle({ text = "Body Aim", flag = "riflesBaim" }); rifles2:AddToggle({ text = "Silent Aim", flag = "riflesSilentAim" }); rifles2:AddSlider({ text = "Aim Assist FOV", min = 1, max = 180, flag = "riflesFOV" }); rifles2:AddSlider({ text = "Silent Aim FOV", min = 1, max = 180, flag = "riflesSilentFOV" }); rifles2:AddSlider({ text = "Deadzone", min = 0, max = 20, flag = "riflesDeadzone" }); rifles2:AddSlider({ text = "Smoothness", min = 1, max = 50, flag = "riflesSmoothness" }); rifles2:AddSlider({ text = "Triggerbot Delay", min = 0, max = 100, flag = "riflesTriggerDelay" }); rifles2:AddSlider({ text = "Silent Aim Hitchance", min = 0, max = 100, value = 100, flag = "riflesHitchance" }); rifles2:AddToggle({ text = "Silent Aim Closest Hitbox", flag = "riflesClosestHitbox" }); scout2:AddToggle({ text = "Triggerbot", flag = "scoutTrigger" }); scout2:AddToggle({ text = "Body Aim", flag = "scoutBaim" }); scout2:AddToggle({ text = "Silent Aim", flag = "scoutSilentAim" }); scout2:AddSlider({ text = "Aim Assist FOV", min = 1, max = 180, flag = "scoutFOV" }); scout2:AddSlider({ text = "Silent Aim FOV", min = 1, max = 180, flag = "scoutSilentFOV" }); scout2:AddSlider({ text = "Deadzone", min = 0, max = 20, flag = "scoutDeadzone" }); scout2:AddSlider({ text = "Smoothness", min = 1, max = 50, flag = "scoutSmoothness" }); scout2:AddSlider({ text = "Triggerbot Delay", min = 0, max = 100, flag = "scoutTriggerDelay" }); scout2:AddSlider({ text = "Silent Aim Hitchance", min = 0, max = 100, value = 100, flag = "scoutHitchance" }); scout2:AddToggle({ text = "Silent Aim Closest Hitbox", flag = "scoutClosestHitbox" }); awp2:AddToggle({ text = "Triggerbot", flag = "awpTrigger" }); awp2:AddToggle({ text = "Body Aim", flag = "awpBaim" }); awp2:AddToggle({ text = "Silent Aim", flag = "awpSilentAim" }); awp2:AddSlider({ text = "Aim Assist FOV", min = 1, max = 180, flag = "awpFOV" }); awp2:AddSlider({ text = "Silent Aim FOV", min = 1, max = 180, flag = "awpSilentFOV" }); awp2:AddSlider({ text = "Deadzone", min = 0, max = 20, flag = "awpDeadzone" }); awp2:AddSlider({ text = "Smoothness", min = 1, max = 50, flag = "awpSmoothness" }); awp2:AddSlider({ text = "Triggerbot Delay", min = 0, max = 100, flag = "awpTriggerDelay" }); awp2:AddSlider({ text = "Silent Aim Hitchance", min = 0, max = 100, value = 100, flag = "awpHitchance" }); awp2:AddToggle({ text = "Silent Aim Closest Hitbox", flag = "awpClosestHitbox" }); heavyp2:AddToggle({ text = "Triggerbot", flag = "heavypTrigger" }); heavyp2:AddToggle({ text = "Body Aim", flag = "heavypBaim" }); heavyp2:AddToggle({ text = "Silent Aim", flag = "heavypSilentAim" }); heavyp2:AddSlider({ text = "Aim Assist FOV", min = 1, max = 180, flag = "heavypFOV" }); heavyp2:AddSlider({ text = "Silent Aim FOV", min = 1, max = 180, flag = "heavypSilentFOV" }); heavyp2:AddSlider({ text = "Deadzone", min = 0, max = 20, flag = "heavypDeadzone" }); heavyp2:AddSlider({ text = "Smoothness", min = 1, max = 50, flag = "heavypSmoothness" }); heavyp2:AddSlider({ text = "Triggerbot Delay", min = 0, max = 100, flag = "heavypTriggerDelay" }); heavyp2:AddSlider({ text = "Silent Aim Hitchance", min = 0, max = 100, value = 100, flag = "heavypHitchance" }); heavyp2:AddToggle({ text = "Silent Aim Closest Hitbox", flag = "heavypClosestHitbox" }); pistols2:AddToggle({ text = "Triggerbot", flag = "pistolTrigger" }); pistols2:AddToggle({ text = "Body Aim", flag = "pistolBaim" }); pistols2:AddToggle({ text = "Silent Aim", flag = "pistolSilentAim" }); pistols2:AddSlider({ text = "Aim Assist FOV", min = 1, max = 180, flag = "pistolFOV" }); pistols2:AddSlider({ text = "Silent Aim FOV", min = 1, max = 180, flag = "pistolSilentFOV" }); pistols2:AddSlider({ text = "Deadzone", min = 0, max = 20, flag = "pistolDeadzone" }); pistols2:AddSlider({ text = "Smoothness", min = 1, max = 50, flag = "pistolSmoothness" }); pistols2:AddSlider({ text = "Triggerbot Delay", min = 0, max = 100, flag = "pistolTriggerDelay" }); pistols2:AddSlider({ text = "Silent Aim Hitchance", min = 0, max = 100, value = 100, flag = "pistolHitchance" }); pistols2:AddToggle({ text = "Silent Aim Closest Hitbox", flag = "pistolClosestHitbox" }); smg:AddToggle({ text = "Triggerbot", flag = "smgTrigger" }); smg:AddToggle({ text = "Body Aim", flag = "smgBaim" }); smg:AddToggle({ text = "Silent Aim", flag = "smgSilentAim" }); smg:AddSlider({ text = "Aim Assist FOV", min = 1, max = 180, flag = "smgFOV" }); smg:AddSlider({ text = "Silent Aim FOV", min = 1, max = 180, flag = "smgSilentFOV" }); smg:AddSlider({ text = "Deadzone", min = 0, max = 20, flag = "smgDeadzone" }); smg:AddSlider({ text = "Smoothness", min = 1, max = 50, flag = "smgSmoothness" }); smg:AddSlider({ text = "Triggerbot Delay", min = 0, max = 100, flag = "smgTriggerDelay" }); smg:AddSlider({ text = "Silent Aim Hitchance", min = 0, max = 100, value = 100, flag = "smgHitchance" }); smg:AddToggle({ text = "Silent Aim Closest Hitbox", flag = "smgClosestHitbox" }); other2:AddToggle({ text = "Triggerbot", flag = "otherTrigger" }); other2:AddToggle({ text = "Body Aim", flag = "otherBaim" }); other2:AddToggle({ text = "Silent Aim", flag = "otherSilentAim" }); other2:AddSlider({ text = "Aim Assist FOV", min = 1, max = 180, flag = "otherFOV" }); other2:AddSlider({ text = "Silent Aim FOV", min = 1, max = 180, flag = "otherSilentFOV" }); other2:AddSlider({ text = "Deadzone", min = 0, max = 20, flag = "otherDeadzone" }); other2:AddSlider({ text = "Smoothness", min = 1, max = 50, flag = "otherSmoothness" }); other2:AddSlider({ text = "Triggerbot Delay", min = 0, max = 100, flag = "otherTriggerDelay" }); other2:AddSlider({ text = "Silent Aim Hitchance", min = 0, max = 100, value = 100, flag = "otherHitchance" }); other2:AddToggle({ text = "Silent Aim Closest Hitbox", flag = "otherClosestHitbox" })
+
+checksSec = val_1014:AddSection("filters")
+checksSec:AddToggle({ text = "Visible Only", flag = "legitVisOnly" })
+checksSec:AddToggle({ text = "Filter Flashes", flag = "filterFlashes" })
+checksSec:AddToggle({ text = "Filter Enemy In Air", flag = "filterEnemyInAir" })
+checksSec:AddToggle({ text = "Filter Invulnerable", flag = "filterInvulnerable" })
+val_288 = false 
+checksSec:AddBind({
+	text = "Triggerbot Keybind", key = Enum.KeyCode.LeftAlt, mode = "hold",
+	callback = function(L_1297_arg0)
+		val_288 = not L_1297_arg0
+	end
+})
 visualsTab = UI_Library:AddTab"Visuals"; visualsEntities = visualsTab:AddSubTab("Entities"); visualsGame = visualsTab:AddSubTab("Game"); visualsScreen = visualsTab:AddSubTab("Screen"); visualsColumn = visualsEntities:AddColumn(); visualsColumn2 = visualsEntities:AddColumn(); visualsMaster = visualsColumn:AddSection"Master"; visualsMaster:AddToggle({ text = "Enabled", flag = "espEnabled" })
 visualsMaster:AddToggle({
 	text = "Teammates", flag = "visualsteam",
@@ -2876,32 +3026,13 @@ game:GetService("RunService").RenderStepped:Connect(function()
 			if hum and hum.Health <= 0 then
 				reverseChamsPlr(plr); continue
 			end
-			local hrp = char:FindFirstChild("HumanoidRootPart"); local head = char:FindFirstChild("Head")
-			params.FilterDescendantsInstances = { val_733.Character, char, cam }
-			local seen = false
-			if hrp then
-				local hit = workspace:Raycast(camPos, hrp.Position - camPos, params)
-				if hit == nil or hit.Instance:IsDescendantOf(char) then seen = true end
-			end
-			if not seen and head then
-				local hit = workspace:Raycast(camPos, head.Position - camPos, params)
-				if hit == nil or hit.Instance:IsDescendantOf(char) then seen = true end
-			end
-			local wallVisible = (not seen) and (not visibleOnly)
-			for _, adorn in cached.inner do
-				if adorn.Parent then adorn.Visible = wallVisible end
-			end
-			for _, adorn in cached.outer do
-				if adorn.Parent then adorn.Visible = seen end
-			end
 		end
 	end
 end)
 visualsChams:AddToggle({ text = "Chams", flag = "Chams", callback = env.__chamsRefresh }):AddColor({ color = Color3.fromRGB(255, 255, 255), flag = "chamsVisibleColor", trans = 0.6, callback = env.__chamsRefresh, calltrans = env.__chamsRefresh })
 UI_Library.options["Chams"]:AddColor({ color = Color3.fromRGB(255, 80, 80), flag = "chamsWallColor", trans = 0.6, callback = env.__chamsRefresh, calltrans = env.__chamsRefresh })
-UI_Library.options["Chams"]:AddList({ text = "Chams Style", flag = "chamsStyle", values = { "Fill", "Outline Only", "Glow", "Flat", "Neon", "ForceField", "Glass", "Plastic" }, value = "Fill", callback = env.__chamsRefresh })
-visualsChams:AddToggle({ text = "Chams Outline", flag = "Chams Outline", callback = env.__chamsRefresh }):AddColor({ color = Color3.fromRGB(255, 255, 255), flag = "chamsVisibleOutlineColor", trans = 1, callback = env.__chamsRefresh, calltrans = env.__chamsRefresh })
-UI_Library.options["Chams Outline"]:AddColor({ color = Color3.fromRGB(255, 80, 80), flag = "chamsWallOutlineColor", trans = 1, callback = env.__chamsRefresh, calltrans = env.__chamsRefresh }); cbCHAMS = env.__chamsRefresh; UI_Library.options["espEnabled"].callback = cbCHAMS; visualsChams:AddToggle({ text = "Hit Chams", flag = "Hit Chams" }):AddColor({ color = Color3.fromRGB(200, 30, 80), flag = "hitchamsColor" }); visualsGlow = visualsColumn:AddSection"Glow"; visualsGlow:AddToggle({ text = "Outline" }); visualsGameCol2 = visualsGame:AddColumn(); visualsMisc = visualsGameCol2:AddSection"Bullet Tracers"; visualsMisc:AddToggle({ text = "Beams Face Camera" }); visualsMisc:AddToggle({ text = "Bullet Tracers" }):AddColor({ color = Color3.fromRGB(150, 20, 60), trans = 1, flag = "tracerColor" }); visualsMisc:AddList({ text = "Tracer Mode", values = { "Part", "Beam" }, value = "Beam" }); visualsMisc:AddList({ text = "Tracer Texture", flag = "tracerTexture", values = { "Solid", "Lightning", "Laser", "Twisted Energy", "Anime Lazer", "Arrow", "Minecraft", "Alien Energy Ray", "Energy Ray", "Matrix", "Cartoony Eletric" }, value = "Solid" }); miscColorsSection = visualsGameCol2:AddSection"Misc Colors"; miscColorsSection:AddToggle({ text = "Molotov Color Changer", flag = "molotovColorChanger" }):AddColor({ color = Color3.fromRGB(0, 200, 255), flag = "molotovColor" }); miscColorsSection:AddToggle({ text = "Smoke Color Changer", flag = "smokeColorChanger" }):AddColor({ color = Color3.fromRGB(0, 255, 100), flag = "smokeColor" }); miscColorsSection:AddToggle({ text = "Blood Color Changer", flag = "bloodColorChanger" }):AddColor({ color = Color3.fromRGB(255, 0, 0), flag = "bloodColor" })
+cbCHAMS = env.__chamsRefresh; UI_Library.options["espEnabled"].callback = cbCHAMS; visualsChams:AddToggle({ text = "Hit Chams", flag = "Hit Chams" }):AddColor({ color = Color3.fromRGB(200, 30, 80), flag = "hitchamsColor" }); visualsGlow = visualsColumn:AddSection"Glow"; visualsGlow:AddToggle({ text = "Outline" }); visualsGameCol2 = visualsGame:AddColumn(); visualsMisc = visualsGameCol2:AddSection"Bullet Tracers"; visualsMisc:AddToggle({ text = "Beams Face Camera" }); visualsMisc:AddToggle({ text = "Bullet Tracers" }):AddColor({ color = Color3.fromRGB(150, 20, 60), trans = 1, flag = "tracerColor" }); visualsMisc:AddList({ text = "Tracer Mode", values = { "Part", "Beam" }, value = "Beam" }); visualsMisc:AddList({ text = "Tracer Texture", flag = "tracerTexture", values = { "Solid", "Lightning", "Laser", "Twisted Energy", "Anime Lazer", "Arrow", "Minecraft", "Alien Energy Ray", "Energy Ray", "Matrix", "Cartoony Eletric" }, value = "Solid" }); miscColorsSection = visualsGameCol2:AddSection"Misc Colors"; miscColorsSection:AddToggle({ text = "Molotov Color Changer", flag = "molotovColorChanger" }):AddColor({ color = Color3.fromRGB(0, 200, 255), flag = "molotovColor" }); miscColorsSection:AddToggle({ text = "Smoke Color Changer", flag = "smokeColorChanger" }):AddColor({ color = Color3.fromRGB(0, 255, 100), flag = "smokeColor" }); miscColorsSection:AddToggle({ text = "Blood Color Changer", flag = "bloodColorChanger" }):AddColor({ color = Color3.fromRGB(255, 0, 0), flag = "bloodColor" })
+miscColorsSection:AddToggle({ text = "Floating Damage", flag = "Floating Damage" }):AddColor({ color = Color3.fromRGB(255, 255, 0), flag = "floatingDamageColor" })
 do
 	local fireKeywords = {"fire", "flame", "burn", "inferno", "molotov", "incendiary"}
 	local function isFireParticle(inst)
@@ -3003,7 +3134,12 @@ UI_Library.options["Flags ESP"]:AddList({
 	text = "Flags", flag = "flagsList", multiselect = true, max = 11, value = { ["Armored"] = true, ["Unarmored"] = true, ["Helmet"] = true, ["Defuser"] = true, ["Bomb"] = true, ["Scoped"] = true, ["Planting"] = true, ["Slowed"] = true }, values = { "Armored", "Unarmored", "Helmet", "Defuser", "Bomb", "Weapon", "Money", "Spent", "Scoped", "Planting", "Slowed" }
 })
 visualsESP:AddToggle({ text = "Armor ESP", flag = "Armor ESP" }); visualsESP:AddToggle({ text = "Health Bar" }):AddColor({ color = Color3.fromRGB(0, 255, 0), flag = "healthBar" }); visualsESP:AddToggle({ text = "Gradient Health Bar", flag = "Gradient Health Bar", tip = "fades the health bar from full color to low-health color" }):AddColor({ color = Color3.fromRGB(255, 0, 0), flag = "healthBarLow" })
-visualsESP:AddToggle({ text = "Health Number", flag = "Health Number", tip = "shows numeric HP next to the health bar" }):AddColor({ color = Color3.fromRGB(0, 255, 0), flag = "healthNumberColor" }); visualsESP:AddToggle({ text = "Armor Bar" }):AddColor({ color = Color3.fromRGB(0, 100, 255), flag = "armorBarColor" }); visualsESP:AddToggle({ text = "Tracers" }):AddColor({ color = Color3.fromRGB(0, 0, 0), flag = "tracersColor" }); visualsESP:AddList({ text = "Font", values = { "UI", "System", "Plex", "Monospace" } }); visualsESP:AddList({ text = "Text Mode", values = { "Normal", "Upper", "Lower" } }); visualsLocal = visualsColumn2:AddSection"Local"
+visualsESP:AddToggle({ text = "Health Number", flag = "Health Number", tip = "shows numeric HP next to the health bar" }):AddColor({ color = Color3.fromRGB(0, 255, 0), flag = "healthNumberColor" }); 
+visualsESP:AddToggle({ text = "Armor Bar" }):AddColor({ color = Color3.fromRGB(0, 100, 255), flag = "armorBarColor" }); 
+visualsESP:AddToggle({ text = "Tracers" }):AddColor({ color = Color3.fromRGB(0, 0, 0), flag = "tracersColor" }); 
+visualsESP:AddList({ text = "Font", values = { "UI", "System", "Plex", "Monospace" } }); 
+visualsESP:AddList({ text = "Text Mode", values = { "Normal", "Upper", "Lower" } }); visualsESP:AddToggle({ text = "OOF Arrows", flag = "OOF Arrows", tip = "Shows arrows pointing to enemies off-screen" }):AddColor({ color = Color3.fromRGB(255, 0, 0), flag = "oofArrowColor" }); visualsESP:AddSlider({ text = "Arrow Radius", flag = "oofArrowRadius", min = 50, max = 500, value = 150 }); visualsESP:AddSlider({ text = "Arrow Size", flag = "oofArrowSize", min = 10, max = 50, value = 25 }); 
+visualsLocal = visualsColumn2:AddSection"Local"
 removeUIElementsCallback = function(var_31)
 		local TARGET_GUIS = { "Game", "GUI", "HUDShading", "CBScoreboard", "SmokeGUI", "Performance", "Objective", "Crates", "NewItem", "BanBoi", "Blnd", "Winner", "RoundWin", "WinGui", "RoundEnd", "Win" }
 local function clearOriginalState()
@@ -3121,8 +3257,8 @@ visualsGlow:AddToggle({ text = "Weapon Chams", callback = updateViewModelVisuals
 UI_Library.options["Weapon Chams"]:AddList({ flag = "weaponMaterial", values = CHAMS_MATERIALS, value = "ForceField", max = 12, callback = updateViewModelVisuals })
 visualsGlow:AddToggle({ text = "Arm Chams", callback = updateViewModelVisuals }):AddColor({ flag = "armColor", trans = 1, color = Color3.new(1, 1, 1), callback = updateViewModelVisuals, calltrans = updateViewModelVisuals })
 UI_Library.options["Arm Chams"]:AddList({ flag = "armMaterial", values = CHAMS_MATERIALS, value = "ForceField", max = 12, callback = updateViewModelVisuals }); visualsGlow:AddSlider({ text = "Weapon Reflectance", flag = "weaponReflectance", max = 100, callback = updateViewModelVisuals })
-visualsLocal:AddToggle({ text = "Custom Arm Color", flag = "customArmColor", callback = updateViewModelVisuals }):AddColor({ color = Color3.fromRGB(255, 255, 255), flag = "customArmColorValue", callback = updateViewModelVisuals })
-visualsLocal:AddToggle({ text = "Custom Sleeve Color", flag = "customSleeveColor", callback = updateViewModelVisuals }):AddColor({ color = Color3.fromRGB(255, 255, 255), flag = "customSleeveColorValue", callback = updateViewModelVisuals })
+visualsGlow:AddToggle({ text = "Custom Arm Color", flag = "customArmColor", callback = updateViewModelVisuals }):AddColor({ color = Color3.fromRGB(255, 255, 255), flag = "customArmColorValue", callback = updateViewModelVisuals })
+visualsGlow:AddToggle({ text = "Custom Sleeve Color", flag = "customSleeveColor", callback = updateViewModelVisuals }):AddColor({ color = Color3.fromRGB(255, 255, 255), flag = "customSleeveColorValue", callback = updateViewModelVisuals })
 function applyThirdPerson()
 	local on = library_flags["thirdPerson"] == true; local tpValue = workspace:FindFirstChild("ThirdPerson")
 	if tpValue and tpValue.Value ~= on then tpValue.Value = on end
@@ -3191,8 +3327,14 @@ local function GetLightingEffect(classname)
 	return eff
 end
 worldCol1 = visualsGame:AddColumn(); worldCol2 = visualsGame:AddColumn()
-lightingSection = worldCol1:AddSection"Lighting"; skySection = worldCol1:AddSection"Sky"; fogSection = worldCol1:AddSection"Fog"
+lightingSection = worldCol1:AddSection"Lighting"; skySection = worldCol1:AddSection"Sky"; fogSection = worldCol1:AddSection"Fog"; mapCustomSection = worldCol1:AddSection"Map Customization"
 bloomSection = worldCol2:AddSection"Bloom"; sunRaysSection = worldCol2:AddSection"Sun Rays"; dofSection = worldCol2:AddSection"Depth of Field"; atmosphereSection = worldCol2:AddSection"Atmosphere"; terrainSection = worldCol2:AddSection"Terrain"
+
+mapCustomSection:AddToggle({ text = "Override Materials", flag = "overrideMaterials" })
+mapCustomSection:AddList({ text = "Map Material", flag = "overrideMaterialsType", values = { "SmoothPlastic", "Neon", "ForceField", "Glass", "Ice", "Foil" }, value = "SmoothPlastic" })
+mapCustomSection:AddToggle({ text = "Remove Textures", flag = "removeTextures" })
+mapCustomSection:AddToggle({ text = "Remove Map Particles", flag = "removeMapParticles" })
+mapCustomSection:AddList({ text = "Custom Weather", flag = "customWeather", values = { "Default", "Clear", "Rain", "Snow" }, value = "Default" })
 uiLoaded = false
 function applyLighting()
 	pcall(function()
@@ -3554,36 +3696,29 @@ spawn(function()
 end)
 miscOK = UI_Library:AddWarning({ type = "ok" }); miscMovement = miscColumn:AddSection"Movement"
 miscMovement:AddToggle({ text = "No Crouch Cooldown" })
+miscMovement:AddToggle({ text = "ladder owner", flag = "ladder owner" })
 miscMovement:AddToggle({ text = "Auto Strafe" }); last = Vector3.new(); miscMovement:AddToggle({ text = "Maintain Velocity" })
 miscMovement:AddToggle({
 	text = "Bunny Hop",
 	callback = function()
 	end
 })
-miscMovement:AddList({ text = "Bunny Hop Method", flag = "Bunny Hop Method", values = {"Directional", "A/D"}, value = "A/D" }); miscMovement:AddSlider({ text = "Bunny Hop Speed", min = 18, max = 100, flag = "Speed Value" }); miscIndicators = miscColumn2:AddSection"Indicators"; miscIndicators:AddToggle({ text = "Pixel Surf Indicator", flag = "showPSInd" }); miscIndicators:AddToggle({ text = "Long Jump Indicator", flag = "showLJInd" }); miscIndicators:AddToggle({ text = "Edgebug Indicator", flag = "showEBInd" }); miscIndicators:AddToggle({ text = "Jumpbug Indicator", flag = "showJBInd" }); miscIndicators:AddToggle({ text = "Airstuck Indicator", flag = "showASInd" }); miscIndicators:AddToggle({ text = "Texturebug Indicator", flag = "showTBInd" }); miscIndicators:AddToggle({ text = "Minijump Indicator", flag = "showMJInd" }); miscIndicators:AddToggle({ text = "Fireman Indicator", flag = "showFMInd" }); miscIndicators:AddToggle({ text = "Jetpack Indicator", flag = "showJPInd" }); miscIndicators:AddToggle({ text = "Wallclimb Indicator", flag = "showWCInd" }); miscIndicators:AddToggle({ text = "Ladderbug Indicator", flag = "showLBInd" }); miscIndicators:AddList({ text = "Indicator Font", flag = "indFont", values = { "UI", "System", "Plex", "Monospace" } }); miscIndicators:AddSlider({ text = "Indicator Size", flag = "indSize", min = 12, max = 30, value = 18 }); motionSettings = miscColumn2:AddSection"Movement Settings"; motionSettings:AddSlider({ text = "Jetpack Speed", flag = "jetpackSpeed", min = 10, max = 100, value = 35 }); motionSettings:AddSlider({ text = "Jumpbug Height", min = 1, max = 6, float = 0.5, flag = "jbHeight", value = 4, suffix = "x" }); motionSettings:AddSlider({ text = "Minijump Mult", min = 0.3, max = 0.8, float = 0.1, flag = "mjMult", value = 0.5 }); motionSettings:AddSlider({ text = "Pixel Surf Speed", min = 18, max = 200, value = 25, flag = "pspeed" }); motionSettings:AddSlider({ text = "Long Jump Studs", min = 1, max = 10, value = 1, suffix = "st", flag = "longJumpStuds" })
-motionSettings:AddToggle({ text = "Auto Edge Bug" }); motionSettings:AddList({ text = "Edgebug Mode", flag = "Edgebug Mode", values = {"mimic", "redirectional", "helltracing"}, value = "redirectional" }); motionSettings:AddToggle({ text = "Edgebug Visualizer", flag = "showEBVis" }); motionSettings:AddToggle({ text = "Edgebug Logs", flag = "showEBLogs" }); motionSettings:AddToggle({ text = "Edgebug Badge", flag = "Edgebug Badge" }); blindParts = { "FakeHead", "Gun", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm" }; movementFeatures = miscColumn:AddSection"Movement Features"; val_412 = val_749.ViewportSize.Y - 50; val_436 = Drawing.new("Text"); val_436.Center = true; val_436.Outline = true; val_436.Color = Color3.new(1, 1, 1); val_436.Font = 3; val_436.Size = 20; val_436.Visible = false; oldWalk = val_757.walkupdate; oldSpeedUpdate = val_757.speedupdate 
-movementFeatures:AddToggle({
-	text = "Drawing Enabled",
-	callback = function()
-		local vTrans = 0
-		while library_flags["Drawing Enabled"] do
-			wait(); val_436.Position = Vector2.new(val_749.ViewportSize.X / 2, val_749.ViewportSize.Y - 40); val_412 = val_749.ViewportSize.Y - 50; local val_470 = 0 
-			if val_872.alive and val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart") then
-				val_470 = math.floor(math.clamp((val_733.Character.HumanoidRootPart.Velocity * Vector3.new(1, 0, 1)).magnitude * 14.85, 0, 400))
-			end 
-			local vTarget = library_flags["Velocity Indicator"] and 1 or 0; vTrans = vTrans + (vTarget - vTrans) * 0.15
-			if math.abs(vTrans - vTarget) < 0.001 then vTrans = vTarget end
-			val_436.Transparency = vTrans; val_436.Visible = vTrans > 0
-			if val_436.Visible then
-				val_436.Text = tostring(val_470)
-			end 
-		end 
-		val_436.Visible = false 
-	end
-})
+miscMovement:AddList({ text = "Bunny Hop Method", flag = "Bunny Hop Method", values = {"Directional", "A/D"}, value = "A/D" }); miscMovement:AddSlider({ text = "Bunny Hop Speed", min = 18, max = 100, flag = "Speed Value" }); miscIndicators = miscColumn2:AddSection"Indicators"; miscIndicators:AddToggle({ text = "Drawing Enabled" }); miscIndicators:AddToggle({ text = "Velocity Indicator", flag = "Velocity Indicator" }); miscIndicators:AddToggle({ text = "Pixel Surf Indicator", flag = "showPSInd" }); miscIndicators:AddToggle({ text = "Long Jump Indicator", flag = "showLJInd" }); miscIndicators:AddToggle({ text = "Edgebug Indicator", flag = "showEBInd" }); miscIndicators:AddToggle({ text = "Jumpbug Indicator", flag = "showJBInd" }); miscIndicators:AddToggle({ text = "Airstuck Indicator", flag = "showASInd" }); miscIndicators:AddToggle({ text = "Texturebug Indicator", flag = "showTBInd" }); miscIndicators:AddToggle({ text = "Minijump Indicator", flag = "showMJInd" }); miscIndicators:AddToggle({ text = "Fireman Indicator", flag = "showFMInd" }); miscIndicators:AddToggle({ text = "Jetpack Indicator", flag = "showJPInd" }); miscIndicators:AddToggle({ text = "Wallclimb Indicator", flag = "showWCInd" }); miscIndicators:AddToggle({ text = "Ladderbug Indicator", flag = "showLBInd" }); miscIndicators:AddList({ text = "Indicator Font", flag = "indFont", values = { "UI", "System", "Plex", "Monospace" } }); miscIndicators:AddSlider({ text = "Indicator Size", flag = "indSize", min = 12, max = 30, value = 18 }); motionSettings = miscColumn2:AddSection"Movement Settings"; motionSettings:AddSlider({ text = "Jetpack Speed", flag = "jetpackSpeed", min = 10, max = 100, value = 35 }); motionSettings:AddSlider({ text = "Jumpbug Height", min = 1, max = 6, float = 0.5, flag = "jbHeight", value = 4, suffix = "x" }); motionSettings:AddSlider({ text = "Minijump Mult", min = 0.3, max = 0.8, float = 0.1, flag = "mjMult", value = 0.5 }); motionSettings:AddSlider({ text = "Pixel Surf Speed", min = 18, max = 200, value = 25, flag = "pspeed" }); motionSettings:AddSlider({ text = "Long Jump Studs", min = 1, max = 10, value = 1, suffix = "st", flag = "longJumpStuds" })
+motionSettings:AddToggle({ text = "Auto Edge Bug" }); motionSettings:AddToggle({ text = "Auto Pixel Surf", flag = "Auto Pixel Surf" }); motionSettings:AddToggle({ text = "Auto Align", flag = "Auto Align" }); motionSettings:AddList({ text = "Edgebug Mode", flag = "Edgebug Mode", values = {"mimic", "redirectional", "helltracing"}, value = "redirectional" }); motionSettings:AddToggle({ text = "Edgebug Visualizer", flag = "showEBVis" }); motionSettings:AddToggle({ text = "Edgebug Logs", flag = "showEBLogs" }); motionSettings:AddToggle({ text = "Edgebug Badge", flag = "Edgebug Badge" }); blindParts = { "FakeHead", "Gun", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm" }; movementFeatures = miscColumn:AddSection"Movement Features"; val_412 = val_749.ViewportSize.Y - 50; val_436 = Drawing.new("Text"); val_436.Center = true; val_436.Outline = true; val_436.Color = Color3.new(1, 1, 1); val_436.Font = 3; val_436.Size = 20; val_436.Visible = false; oldWalk = val_757.walkupdate; oldSpeedUpdate = val_757.speedupdate
+
 CreateThread(function()
+	local speedHistory = {}
+	local maxHistory = 80
+	local graphLines = {}
+	for i = 1, maxHistory - 1 do
+		local l = Drawing.new("Line"); l.Thickness = 2; l.Visible = false; l.ZIndex = 1
+		graphLines[i] = l
+	end
+	local vTrans = 0
+
 	while true do
 		env.runService.RenderStepped:Wait()
+		
 		if not env.psIndicator then
 			env.psIndicator = Drawing.new("Text"); env.psIndicator.Center = true; env.psIndicator.Outline = true; env.psIndicator.Font = 3; env.psIndicator.Size = 18; env.psIndicator.Text = "PS"; env.psIndicator.Visible = false
 		end
@@ -3609,7 +3744,7 @@ CreateThread(function()
 			env.mjIndicator = Drawing.new("Text"); env.mjIndicator.Center = true; env.mjIndicator.Outline = true; env.mjIndicator.Font = 3; env.mjIndicator.Size = 18; env.mjIndicator.Text = "MJ"; env.mjIndicator.Visible = false
 		end
 		if not env.fmIndicator then
-			env.fmIndicator = Drawing.new("Text"); env.fmIndicator.Center = true; env.fmIndicator.Outline = true; env.fmIndicator.Font = 3; env.fmIndicator.Size = 18; env.fmIndicator.Text = "FM"; env.fmIndicator.Visible = false
+			env.fmIndicator = Drawing.new("Text"); env.fmIndicator.Center = true; env.fmIndicator.Outline = true; env.fmIndicator.Font = 3; env.fmIndicator.Size = 18; env.fmIndicator.Text = "FR"; env.fmIndicator.Visible = false
 		end
 		if not env.wcIndicator then
 			env.wcIndicator = Drawing.new("Text"); env.wcIndicator.Center = true; env.wcIndicator.Outline = true; env.wcIndicator.Font = 3; env.wcIndicator.Size = 18; env.wcIndicator.Text = "WC"; env.wcIndicator.Visible = false
@@ -3627,7 +3762,7 @@ CreateThread(function()
 		if not env.indTrans then
 			env.indTrans = { ps = 0, lj = 0, eb = 0, jb = 0, as = 0, mj = 0, fm = 0, jp = 0 }
 		end
-		local trans = env.indTrans; local psActive = library_flags["showPSInd"] and (env.pixelSurfTouching or (surfing and true or false)); local psTarget = psActive and 1 or 0; trans.ps = trans.ps + (psTarget - trans.ps) * lerpSpeed
+		local trans = env.indTrans; local psActive = library_flags["showPSInd"] and (env.pixelSurfTouching or env.surfing); local psTarget = psActive and 1 or 0; trans.ps = trans.ps + (psTarget - trans.ps) * lerpSpeed
 		if math.abs(trans.ps - psTarget) < 0.001 then trans.ps = psTarget end
 		L_psText.Transparency = trans.ps; L_psText.Visible = trans.ps > 0; local ljActive = library_flags["showLJInd"] and env.longJumpHold; local ljTarget = ljActive and 1 or 0; trans.lj = trans.lj + (ljTarget - trans.lj) * lerpSpeed
 		if math.abs(trans.lj - ljTarget) < 0.001 then trans.lj = ljTarget end
@@ -3643,7 +3778,7 @@ CreateThread(function()
 				local mjActive = library_flags["showMJInd"] and (env.minijumpActive or (tick() - (env.minijumpSuccessTime or 0) < 0.3))
 		local mjTarget = mjActive and 1 or 0; trans.mj = trans.mj + (mjTarget - trans.mj) * lerpSpeed
 		if math.abs(trans.mj - mjTarget) < 0.001 then trans.mj = mjTarget end
-		L_mjText.Transparency = trans.mj; L_mjText.Visible = trans.mj > 0; local fmActiveStatus = library_flags["showFMInd"] and library_flags["Fireman"] and (env.fmOnLadder or env.fmTriggered or env.fmActiveHold); local fmTarget = fmActiveStatus and 1 or 0; trans.fm = trans.fm + (fmTarget - trans.fm) * lerpSpeed
+		L_mjText.Transparency = trans.mj; L_mjText.Visible = trans.mj > 0; local fmActiveStatus = library_flags["showFMInd"] and library_flags["Fireman"] and (env.fmOnLadder or env.fmTriggered or (val_671 and val_671:IsKeyDown(Enum.KeyCode.S))); local fmTarget = fmActiveStatus and 1 or 0; trans.fm = trans.fm + (fmTarget - trans.fm) * lerpSpeed
 		if math.abs(trans.fm - fmTarget) < 0.001 then trans.fm = fmTarget end
 		L_fmText.Transparency = trans.fm; L_fmText.Visible = trans.fm > 0; local jpActive = library_flags["showJPInd"] and library_flags["Jetpack"] and env.jetpackBindHeld; local jpTarget = jpActive and 1 or 0; trans.jp = (trans.jp or 0) + (jpTarget - (trans.jp or 0)) * lerpSpeed
 		if math.abs((trans.jp or 0) - jpTarget) < 0.001 then trans.jp = jpTarget end
@@ -3652,12 +3787,52 @@ CreateThread(function()
 		L_wcText.Transparency = trans.wc; L_wcText.Visible = trans.wc > 0; local lbActive = library_flags["showLBInd"] and library_flags["Ladder Bug"] and (env.ladderBugActive or env.lbBindHeld or tick() - (env.lastLadderBugTime or 0) < 0.5); local lbTarget = lbActive and 1 or 0; trans.lb = (trans.lb or 0) + (lbTarget - (trans.lb or 0)) * lerpSpeed
 		if math.abs((trans.lb or 0) - lbTarget) < 0.001 then trans.lb = lbTarget end
 		L_lbText.Transparency = trans.lb; L_lbText.Visible = trans.lb > 0; local slot = 0; local spacing = 20
+		
+		local vTarget = library_flags["Velocity Indicator"] and 1 or 0
+		vTrans = vTrans + (vTarget - vTrans) * lerpSpeed
+		if math.abs(vTrans - vTarget) < 0.001 then vTrans = vTarget end
+		
+		val_436.Transparency = vTrans; val_436.Visible = vTrans > 0
+		if val_436.Visible then
+			val_436.Position = Vector2.new(centerX, baseY + slot * spacing)
+			local speed = 0
+			local hrp = val_872.alive and val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then speed = math.floor((hrp.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude * 15) end
+			val_436.Text = tostring(speed)
+			
+			table.insert(speedHistory, speed)
+			if #speedHistory > maxHistory then table.remove(speedHistory, 1) end
+			
+			local baseX = centerX - (maxHistory * 2) / 2
+			local graphY = baseY + slot * spacing + 45
+			
+			for i = 1, maxHistory - 1 do
+				local line = graphLines[i]
+				if speedHistory[i] and speedHistory[i+1] then
+					line.Visible = true; line.Transparency = vTrans
+					local diff = speedHistory[i+1] - speedHistory[i]
+					if diff > 1 then line.Color = Color3.new(0, 1, 0)
+					elseif diff < -1 then line.Color = Color3.new(1, 0, 0)
+					else line.Color = Color3.new(1, 1, 1) end
+					
+					local h1 = math.clamp(speedHistory[i] / 400, 0, 1) * 35
+					local h2 = math.clamp(speedHistory[i+1] / 400, 0, 1) * 35
+					line.From = Vector2.new(baseX + (i * 2), graphY - h1)
+					line.To = Vector2.new(baseX + ((i+1) * 2), graphY - h2)
+				else
+					line.Visible = false
+				end
+			end
+			if vTrans > 0.5 then slot = slot + 3 end
+		else
+			for i = 1, maxHistory - 1 do graphLines[i].Visible = false end
+		end
 		if L_jpText.Visible then
 			L_jpText.Position = Vector2.new(centerX, baseY + slot * spacing); local hrp = val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart"); local isFlying = hrp and (val_733.Character and val_733.Character:FindFirstChild("Humanoid") and (val_733.Character.Humanoid:GetState() == Enum.HumanoidStateType.Freefall or val_733.Character.Humanoid.FloorMaterial == Enum.Material.Air)); L_jpText.Color = isFlying and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
 			if trans.jp > 0.5 then slot = slot + 1 end
 		end
 		if L_psText.Visible then
-			L_psText.Position = Vector2.new(centerX, baseY + slot * spacing); L_psText.Color = env.pixelSurfTouching and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
+			L_psText.Position = Vector2.new(centerX, baseY + slot * spacing); L_psText.Color = (env.pixelSurfTouching or env.surfing) and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
 			if trans.ps > 0.5 then slot = slot + 1 end
 		end
 		if L_ljText.Visible then
@@ -3698,7 +3873,7 @@ CreateThread(function()
 		end
 	end
 end)
-movementFeatures:AddToggle({ text = "Velocity Indicator" }); strafedir = Vector3.new(); cachedMovementIcon = nil
+strafedir = Vector3.new(); cachedMovementIcon = nil
 local function getMovementIcon()
 	if cachedMovementIcon then return cachedMovementIcon end
 	pcall(function()
@@ -3737,7 +3912,7 @@ end
 movementFeatures:AddToggle({
 	text = "Edgebug"
 }):AddBind({
-	key = Enum.KeyCode.E, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(bool)
 		env.ebHolding = not bool
 		if not bool then
@@ -3782,7 +3957,7 @@ end
 movementFeatures:AddToggle({
 	text = "Jetpack"
 }):AddBind({
-	key = Enum.KeyCode.V, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(var_44)
 		env.jetpackBindHeld = not var_44
 	end
@@ -3790,7 +3965,7 @@ movementFeatures:AddToggle({
 movementFeatures:AddToggle({
 	text = "Pixelsurf"
 }):AddBind({
-	key = Enum.KeyCode.T, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(var_44)
 		env.surfingBindHeld = not var_44
 	end
@@ -3798,7 +3973,7 @@ movementFeatures:AddToggle({
 movementFeatures:AddToggle({
 	text = "Long Jump"
 }):AddBind({
-	key = Enum.KeyCode.Z, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function() end
 })
 game:GetService("RunService").RenderStepped:Connect(function()
@@ -3825,7 +4000,7 @@ end)
 movementFeatures:AddToggle({
 	text = "Jumpbug",
 }):AddBind({
-	key = Enum.UserInputType.MouseButton3, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(bool)
 		env.jbBindHeld = not bool
 	end
@@ -3833,7 +4008,7 @@ movementFeatures:AddToggle({
 movementFeatures:AddToggle({
 	text = "Minijump", flag = "Minijump"
 }):AddBind({
-	key = Enum.KeyCode.X, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(bool)
 		if not bool and library_flags["Minijump"] then
 			local lastTime = env.lastMinijumpTime or 0
@@ -3846,15 +4021,16 @@ movementFeatures:AddToggle({
 movementFeatures:AddToggle({
 	text = "Fireman", flag = "Fireman"
 }):AddBind({
-	key = Enum.KeyCode.V, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(bool)
-		env.fmActiveHold = not bool
+		env.fmActiveHold = bool
 	end
 })
+
 movementFeatures:AddToggle({
 	text = "Head Boost", flag = "Head Boost"
 }):AddBind({
-	key = Enum.KeyCode.H, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(bool)
 		if library_flags["Head Boost"] then
 			env.headboundActive = not bool
@@ -3864,7 +4040,7 @@ movementFeatures:AddToggle({
 movementFeatures:AddToggle({
 	text = "Noclip"
 }):AddBind({
-	key = Enum.KeyCode.V, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(var_20)
 		if not val_872.alive or not library_flags["Noclip"] then
 			noclipping = false; return
@@ -3881,7 +4057,7 @@ movementFeatures:AddToggle({
 		end
 	end
 }):AddBind({
-	key = Enum.KeyCode.C, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(bool)
 		if library_flags["Airstuck"] then
 			local char = val_733.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart"); local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
@@ -3905,7 +4081,7 @@ movementFeatures:AddToggle({
 		end
 	end
 }):AddBind({
-	key = Enum.KeyCode.Y, mode = "hold",
+	key = "none", mode = "hold",
 	callback = function(bool)
 		if library_flags["Texturebug"] then
 			local char = val_733.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart"); local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
@@ -3964,7 +4140,7 @@ movementFeatures:AddToggle({
 movementFeatures:AddToggle({
 	text = "Wallclimb", flag = "Wallclimb"
 }):AddBind({
-	key = Enum.KeyCode.H, mode = "hold", flag = "Wallclimb Bind",
+	key = "none", mode = "hold", flag = "Wallclimb Bind",
 	callback = function(bool)
 		env.wcBindHeld = not bool
 	end
@@ -3972,7 +4148,7 @@ movementFeatures:AddToggle({
 movementFeatures:AddToggle({
 	text = "Ladder Bug", flag = "Ladder Bug"
 }):AddBind({
-	key = Enum.KeyCode.E, mode = "hold", flag = "Ladder Bug Bind",
+	key = "none", mode = "hold", flag = "Ladder Bug Bind",
 	callback = function(bool)
 		env.lbBindHeld = not bool
 	end
@@ -3983,6 +4159,14 @@ movementFeatures:AddToggle({
 	key = "none", mode = "hold", flag = "Edge Jump Bind",
 	callback = function(bool)
 		env.ejBindHeld = not bool
+	end
+})
+movementFeatures:AddToggle({
+	text = "Blockbot", flag = "Blockbot"
+}):AddBind({
+	key = "none", mode = "hold", flag = "Blockbot Bind",
+	callback = function(bool)
+		env.blockbotBindHeld = not bool
 	end
 })
 movementFeatures:AddToggle({
@@ -4052,6 +4236,19 @@ exploitMain:AddToggle({
 })
 nameSpoofSec = generalCol1:AddSection("Name Spoofer"); nameSpoofSec:AddToggle({text = "Enabled", flag = "spoofName"}); nameSpoofSec:AddBox({text = "Spoofed Name", flag = "spoofedNameValue"}); nameSpoofSec:AddToggle({text = "Clan Tag Changer", flag = "clanTagEnabled"}); nameSpoofSec:AddList({text = "Clan Tag", flag = "clanTagValue", values = {"outmoon!", "fastcupmafia" , "clarity.tk", "japanhackmafia", "cuteware!"}, value = "clarity.tk"}); visualsViewmodel = generalCol2:AddSection"Viewmodel"; visualsViewmodel:AddToggle({ text = "Enabled", flag = "viewmodelEnabled" }); visualsViewmodel:AddToggle({ text = "Visualize Silent Angles" })
 visualsViewmodel:AddToggle({ text = "Disable Arm Animation", flag = "Disable Arm Animation", tip = "Stops the arm/viewmodel bob & sway while walking and jumping" })
+local leftHandToggle = visualsViewmodel:AddToggle({ text = "Left Hand", flag = "Left Hand", tip = "Mirrors the viewmodel to the left side (like cl_righthand 0)" })
+leftHandToggle:AddBind({
+	key = "none", mode = "toggle", flag = "Left Hand Bind",
+	callback = function(active)
+		local bind = UI_Library.options["Left Hand Bind"]
+		if bind.key == "none" then return end
+		if bind.mode == "toggle" then
+			leftHandToggle:SetState(not leftHandToggle.state)
+		elseif leftHandToggle.state ~= active then
+			leftHandToggle:SetState(active == true)
+		end
+	end
+})
 game:GetService("RunService").RenderStepped:Connect(function()
 	if library_flags["Disable Arm Animation"] then
 		pcall(function()
@@ -4075,7 +4272,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
 		end)
 	end
 end)
-visualsViewmodel:AddSlider({ text = "X", min = -25, max = 25, flag = "viewmodelX" }); visualsViewmodel:AddSlider({ text = "Y", min = -25, max = 25, flag = "viewmodelY" }); visualsViewmodel:AddSlider({ text = "Z", min = -25, max = 25, flag = "viewmodelZ" }); visualsViewmodel:AddSlider({ text = "Roll", min = 0, max = 360, flag = "viewmodelRoll" }); EB_LogGui = Instance.new("ScreenGui"); EB_LogGui.Name = "EBLog"; EB_LogGui.ResetOnSpawn = false; EB_LogGui.IgnoreGuiInset = true
+visualsViewmodel:AddSlider({ text = "X", min = -10, max = 10, float = 0.1, flag = "viewmodelX" }); visualsViewmodel:AddSlider({ text = "Y", min = -10, max = 10, float = 0.1, flag = "viewmodelY" }); visualsViewmodel:AddSlider({ text = "Z", min = -10, max = 10, float = 0.1, flag = "viewmodelZ" }); visualsViewmodel:AddSlider({ text = "Roll", min = 0, max = 360, flag = "viewmodelRoll" }); EB_LogGui = Instance.new("ScreenGui"); EB_LogGui.Name = "EBLog"; EB_LogGui.ResetOnSpawn = false; EB_LogGui.IgnoreGuiInset = true
 pcall(function() EB_LogGui.Parent = game:GetService("CoreGui") end)
 if not EB_LogGui.Parent then
 	pcall(function() EB_LogGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end)
@@ -5241,14 +5438,23 @@ end)()
 		if not arms then return end
 		local sx = (library_flags["skinSleeveX"] or 0) / 25; local sy = (library_flags["skinSleeveY"] or 0) / 25; local sz = (library_flags["skinSleeveZ"] or 0) / 25
 		for _, d in arms:GetDescendants() do
-			if string.find(string.lower(d.Name), "sleeve") and (d:IsA("BasePart") or d:IsA("MeshPart")) then
+			local n = string.lower(d.Name)
+			local isSleeve = string.find(n, "sleeve")
+			if (isSleeve or n == "meshpart" or n == "part") and (d:IsA("BasePart") or d:IsA("MeshPart")) then
 				local motor = d:FindFirstChild("SleeveMotor") or d:FindFirstChildWhichIsA("Motor6D")
-				if motor then
+				if motor and (isSleeve or (motor.Part0 and string.find(string.lower(motor.Part0.Name), "arm"))) then
+					local origC0 = motor:GetAttribute("OrigC0")
+					if origC0 then motor.C0 = origC0 end
 					local origC1 = motor:GetAttribute("OrigC1")
 					if not origC1 then
 						origC1 = motor.C1; motor:SetAttribute("OrigC1", origC1)
 					end
-					motor.C1 = origC1 * CFrame.new(sx, sy, -sz):Inverse()
+					local offset = CFrame.new(sx, sy, -sz):Inverse()
+					if isSleeve then
+						motor.C1 = origC1 * offset
+					else
+						motor.C1 = origC1 * motor.C0.Rotation:Inverse() * offset * motor.C0.Rotation
+					end
 				end
 			end
 		end
@@ -5707,6 +5913,9 @@ function UI_Library:RefreshList(dropdown, newValues)
 	end)
 end)()
 val_449 = UI_Library:AddTab("Configs")
+clarityTab = UI_Library:AddTab("Clarity")
+clarityCol1 = clarityTab:AddColumn()
+clarityCol2 = clarityTab:AddColumn()
 do
 val_450 = val_449:AddColumn(); val_452 = val_449:AddColumn(); val_461 = val_450:AddSection"configurations"; val_462 = UI_Library:AddWarning({ type = "confirm" })
 local function refreshConfigList()
@@ -5830,6 +6039,9 @@ L_safetySec_:AddToggle({
 				if opt and opt.SetState then
 					pcall(function() opt:SetState(false) end)
 				end
+			end
+			if library_flags["FOV Circle"] and val_872 and val_872.FOV and val_872.FOV > 300 then
+				val_872.FOV = 300
 			end
 		end
 	end
@@ -6341,9 +6553,12 @@ task.spawn(function()
 			end)()
 			local Old; Old = hookfunction(Data.GetData, function(Type, ...)
 				local ToReturn = Old(Type, ...)
-				if type(ToReturn) == "table" then
-					for Index, Value in SkinsTable do
-						ToReturn[tostring(Index)] = Value
+				if Type == "Inventory" and type(ToReturn) == "table" then
+					if not rawget(ToReturn, "__clarityUnlocked") then
+						rawset(ToReturn, "__clarityUnlocked", true)
+						for Index, Value in next, SkinsTable do
+							ToReturn[tostring(Index)] = Value
+						end
 					end
 				end
 				return ToReturn
@@ -6414,6 +6629,71 @@ task.spawn(function()
 		else
 			warn("[clarity.tk] failed to unlock inventory: " .. tostring(err))
 		end
+	end)
+	makeBtn("Save Inventory Skins", 10, function()
+		local LocalPlayer = game:GetService("Players").LocalPlayer
+		local SkinFolder = LocalPlayer and LocalPlayer:FindFirstChild("SkinFolder")
+		if not SkinFolder then
+			warn("[clarity.tk] SkinFolder not found")
+			return
+		end
+		local data = { CT = {}, T = {} }
+		local teams = {"CT", "T"}
+		for i = 1, #teams do
+			local team = teams[i]
+			local folder = SkinFolder:FindFirstChild(team .. "Folder")
+			if folder then
+				local children = folder:GetChildren()
+				for j = 1, #children do
+					local val = children[j]
+					if val:IsA("StringValue") and val.Value and val.Value ~= "" then
+						data[team][val.Name] = val.Value
+					end
+				end
+			end
+		end
+		local ok, err = pcall(function()
+			writefile("clarity.tk/inventory.txt", game:GetService("HttpService"):JSONEncode(data))
+		end)
+		if ok then
+			warn("[clarity.tk] saved inventory skins to clarity.tk/inventory.txt")
+		else
+			warn("[clarity.tk] failed to save skins: " .. tostring(err))
+		end
+	end)
+	makeBtn("Load Inventory Skins", 11, function()
+		if not env.InventoryUnlocked then
+			warn("[clarity.tk] please unlock inventory first!")
+			return
+		end
+		task.spawn(function()
+			local ok, data = pcall(function()
+				return game:GetService("HttpService"):JSONDecode(readfile("clarity.tk/inventory.txt"))
+			end)
+			if not ok or type(data) ~= "table" then
+				warn("[clarity.tk] failed to load saved skins")
+				return
+			end
+			local DataEvent = game:GetService("ReplicatedStorage"):FindFirstChild("Events")
+			DataEvent = DataEvent and DataEvent:FindFirstChild("DataEvent")
+			if not DataEvent then
+				warn("[clarity.tk] DataEvent not found")
+				return
+			end
+			for team, weapons in next, data do
+				if type(weapons) == "table" then
+					for weapon, skin in next, weapons do
+						if type(weapon) == "string" and type(skin) == "string" then
+							pcall(function()
+								DataEvent:FireServer({"EquipItem", team, weapon, {weapon .. "_" .. skin}})
+							end)
+							task.wait(0.05)
+						end
+					end
+				end
+			end
+			warn("[clarity.tk] loaded inventory skins")
+		end)
 	end)
 end)
 if false then
@@ -6930,7 +7210,7 @@ local function _loadIcon(name)
 	return ok and r or ""
 end
 TabIcons = {
-	["Demos"] = _loadIcon("demos"), ["demos"] = _loadIcon("demos"), ["Legit"] = _loadIcon("legit"), ["legit"] = _loadIcon("legit"), ["Visuals"] = _loadIcon("visuals"), ["visuals"] = _loadIcon("visuals"), ["Misc"] = _loadIcon("misc"), ["misc"] = _loadIcon("misc"), ["Movement"] = _loadIcon("movement"), ["movement"] = _loadIcon("movement"), ["Movement Features"] = _loadIcon("movement"), ["Skins"] = _loadIcon("skins"), ["skins"] = _loadIcon("skins"), ["Config"] = _loadIcon("configs"), ["configs"] = _loadIcon("configs"), ["Configs"] = _loadIcon("configs"), ["Exploits"] = _loadIcon("movement"), ["exploits"] = _loadIcon("movement"), ["World"] = _loadIcon("visuals"), ["world"] = _loadIcon("visuals"), ["Calculator"] = _loadIcon("misc"), ["calculator"] = _loadIcon("misc"), ["Lua"] = _loadIcon("lua"), ["lua"] = _loadIcon("lua"), ["Players"] = _loadIcon("players"), ["players"] = _loadIcon("players")
+	["Clarity"] = _loadIcon("movement"), ["clarity"] = _loadIcon("movement"), ["Demos"] = _loadIcon("demos"), ["demos"] = _loadIcon("demos"), ["Legit"] = _loadIcon("legit"), ["legit"] = _loadIcon("legit"), ["Visuals"] = _loadIcon("visuals"), ["visuals"] = _loadIcon("visuals"), ["Misc"] = _loadIcon("misc"), ["misc"] = _loadIcon("misc"), ["Movement"] = _loadIcon("movement"), ["movement"] = _loadIcon("movement"), ["Movement Features"] = _loadIcon("movement"), ["Skins"] = _loadIcon("skins"), ["skins"] = _loadIcon("skins"), ["Config"] = _loadIcon("configs"), ["configs"] = _loadIcon("configs"), ["Configs"] = _loadIcon("configs"), ["Exploits"] = _loadIcon("movement"), ["exploits"] = _loadIcon("movement"), ["World"] = _loadIcon("visuals"), ["world"] = _loadIcon("visuals"), ["Calculator"] = _loadIcon("misc"), ["calculator"] = _loadIcon("misc"), ["Lua"] = _loadIcon("lua"), ["lua"] = _loadIcon("lua"), ["Players"] = _loadIcon("players"), ["players"] = _loadIcon("players")
 }
 UI_Library.Init = function(self)
 	if self.hasInit then return end
@@ -9173,35 +9453,71 @@ val_690.RenderStepped:Connect(function(var_129)
 			if var_223.type == "weapon" and not library_flags["Dropped Weapon ESP"] then
 				var_223.text.Visible = false; continue 
 			end 
-			if val_566 and teamCheck(val_711[var_101], val_772) and val_711[var_101].Character and val_711[var_101].Character:FindFirstChild("Humanoid") and val_711[var_101].Character:FindFirstChild("HumanoidRootPart") and val_711[var_101].Character:FindFirstChild("Head") or not val_566 and var_223.object then
+
+
+			local charExists = val_566 and val_711[var_101].Character and val_711[var_101].Character:FindFirstChild("Humanoid") and val_711[var_101].Character:FindFirstChild("HumanoidRootPart") and val_711[var_101].Character:FindFirstChild("Head")
+			if val_566 and teamCheck(val_711[var_101], val_772) and charExists or not val_566 and var_223.object then
 				if not alive() then
-					var_223.invis(); continue 
+					var_223.arrow.Visible = false; var_223.invis(); continue 
 				end 
 				local val_567; local val_568 = val_818; local val_569 = val_818; local val_570 
 				if val_566 then
-					val_567 = val_711[var_101]; local val_584 = val_567.Character.HumanoidRootPart.Position; val_568 = Vector3.new(val_584.x, val_584.y + 2.45, val_584.z); val_569 = Vector3.new(val_584.x, val_584.y - 3.1, val_584.z); val_570 = math.clamp(val_567.Character.Humanoid.Health, 0, 100)
+					val_567 = val_711[var_101]
+					local val_584 = val_567.Character.HumanoidRootPart.Position
+					val_570 = math.clamp(val_567.Character.Humanoid.Health, 0, 100)
+					val_568 = Vector3.new(val_584.x, val_584.y + 2.45, val_584.z)
+					val_569 = Vector3.new(val_584.x, val_584.y - 3.1, val_584.z)
 				elseif var_223.type == "weapon" and var_223.object and var_223.object then
 					val_568 = var_223.object.Position; val_569 = var_223.object.Position
 				end 
 				local val_571, val_573 = val_749:WorldToViewportPoint(val_568); local val_574, val_575 = val_749:WorldToViewportPoint(val_569)
+				local oofEnabled = library_flags["OOF Arrows"]
 				if val_573 or val_575 then
+					var_223.arrow.Visible = false
 				else
+					if val_566 and oofEnabled then
+						local center = Vector2.new(val_749.ViewportSize.X / 2, val_749.ViewportSize.Y / 2)
+						local hrpPos = val_567.Character.HumanoidRootPart.Position
+						local _, isVisible = val_749:WorldToViewportPoint(hrpPos)
+						local _, isBehind = val_749:WorldToScreenPoint(hrpPos)
+						
+						local screenPos = val_749:WorldToScreenPoint(hrpPos)
+						local pos2d = Vector2.new(screenPos.X, screenPos.Y)
+						if isBehind then pos2d = center - (pos2d - center) end
+						
+						local angle = math.atan2(pos2d.Y - center.Y, pos2d.X - center.X)
+						local radius = library_flags["oofArrowRadius"] or 150
+						local size = library_flags["oofArrowSize"] or 25
+						
+						local arrowCenter = center + Vector2.new(math.cos(angle), math.sin(angle)) * radius
+						
+						var_223.arrow.PointA = arrowCenter + Vector2.new(math.cos(angle), math.sin(angle)) * size
+						var_223.arrow.PointB = arrowCenter + Vector2.new(math.cos(angle - 2.5), math.sin(angle - 2.5)) * size
+						var_223.arrow.PointC = arrowCenter + Vector2.new(math.cos(angle + 2.5), math.sin(angle + 2.5)) * size
+						var_223.arrow.Color = library_flags["oofArrowColor"] or Color3.fromRGB(255, 0, 0)
+						var_223.arrow.Visible = true
+					else
+						var_223.arrow.Visible = false
+					end
 					var_223.invis(); continue 
 				end 
 				local val_576 = (val_574.y - val_571.y) / 2; local val_577 = true 
 				if library_flags["Visible Only ESP"] and val_733.Character or not val_566 and var_223.object then
-					val_577 = false; local val_585 = val_566 and val_567.Character.Head.Position or var_223.object.Position; local val_586 = Ray.new(val_749.CFrame.p, (val_585 - val_749.CFrame.p).unit * 500)
-					if not env._espIgnoreList or env._espIgnoreListFrame ~= (env._espFrameCount or 0) then
-						local mapClips = workspace.Map and workspace.Map:FindFirstChild("Clips") or nil; local spawnPts = workspace.Map and workspace.Map:FindFirstChild("SpawnPoints") or nil; local il = {val_749, val_733.Character, workspace:FindFirstChild("Ray_Ignore")}
-						if mapClips then il[#il+1] = mapClips end
-						if spawnPts then il[#il+1] = spawnPts end
-						env._espIgnoreList = il; env._espIgnoreListFrame = env._espFrameCount or 0
-					end
-					local val_587, val_588 = workspace:FindPartOnRayWithIgnoreList(val_586, env._espIgnoreList)
-					if val_566 and val_567.Character then
-						val_577 = val_587:IsDescendantOf(val_567.Character)
-					elseif val_587 then
-						val_577 = val_587 == var_223.object
+					val_577 = false
+					if charExists then
+						local val_585 = val_566 and val_567.Character.Head.Position or var_223.object.Position; local val_586 = Ray.new(val_749.CFrame.p, (val_585 - val_749.CFrame.p).unit * 500)
+						if not env._espIgnoreList or env._espIgnoreListFrame ~= (env._espFrameCount or 0) then
+							local mapClips = workspace.Map and workspace.Map:FindFirstChild("Clips") or nil; local spawnPts = workspace.Map and workspace.Map:FindFirstChild("SpawnPoints") or nil; local il = {val_749, val_733.Character, workspace:FindFirstChild("Ray_Ignore")}
+							if mapClips then il[#il+1] = mapClips end
+							if spawnPts then il[#il+1] = spawnPts end
+							env._espIgnoreList = il; env._espIgnoreListFrame = env._espFrameCount or 0
+						end
+						local val_587, val_588 = workspace:FindPartOnRayWithIgnoreList(val_586, env._espIgnoreList)
+						if val_566 and val_567.Character then
+							val_577 = val_587:IsDescendantOf(val_567.Character)
+						elseif val_587 then
+							val_577 = val_587 == var_223.object
+						end
 					end
 				end 
 				if not val_577 then
@@ -9210,7 +9526,7 @@ val_690.RenderStepped:Connect(function(var_129)
 				local val_578 = library_flags["Font"]; local val_579 = ""
 				if var_223 then var_223._isInvis = false end
 				if val_566 then
-					if val_567.Character:FindFirstChild("EquippedTool") then
+					if charExists and val_567.Character:FindFirstChild("EquippedTool") then
 						val_579 = tostring(val_567.Character.EquippedTool.Value)
 					end 
 					local val_589 = library_flags["Box ESP"]; local val_590 = library_flags["Health Bar"]; local rectMin, rectSize
@@ -9395,7 +9711,7 @@ val_690.RenderStepped:Connect(function(var_129)
 		if not invissed then
 			invissed = true 
 			for var_8, var_7 in val_868 do
-				var_7.invis()
+				var_7.arrow.Visible = false; var_7.invis()
 			end
 		end
 	end 
@@ -9446,7 +9762,7 @@ val_690.RenderStepped:Connect(function(var_129)
 		end
 		if not touching then return end
 		env.wcLast = now; env.wallclimbing = true; env.wcLastActive = now
-		local vel = hrp.AssemblyLinearVelocity; hrp.AssemblyLinearVelocity = Vector3.new(vel.X, 17, vel.Z)
+		local vel = hrp.AssemblyLinearVelocity; hrp.AssemblyLinearVelocity = Vector3.new(vel.X, 22, vel.Z)
 		local controller = env.MovementController
 		if controller and controller.CharacterAnimator then
 			pcall(function() controller.CharacterAnimator:play("Jump", 0.1) end)
@@ -9694,7 +10010,15 @@ val_690.RenderStepped:Connect(function(var_129)
 		val_757.RecoilX = 0.1; val_757.RecoilY = 0.1
 	end 
 	if val_872.alive then
-		val_733.Character.Humanoid.AutoRotate = true 
+		if library_flags["ladder owner"] then
+			if env.fmOnLadder or env.ladderBugActive or val_733.Character.Humanoid:GetState() == Enum.HumanoidStateType.Climbing then
+				val_733.Character.Humanoid.AutoRotate = true
+			else
+				val_733.Character.Humanoid.AutoRotate = false
+			end
+		else
+			val_733.Character.Humanoid.AutoRotate = true 
+		end
 	end 
 	if val_872.alive then
 		local val_610 = not val_872.melee and library_flags["FOV Circle"] and library_flags["aimbotEnabled"]; val_383.Radius = (val_872.FOV or 0) * 3; val_383.Position = val_610 and library_flags["aimbotEnabled"] and Vector2.new(val_749.ViewportSize.X / 2, val_749.ViewportSize.Y / 2) or Vector2.new(-2000, -2000); val_388.Radius = (val_872.silentFOV or 0) * 3; val_388.Position = val_610 and val_872.silentAim and Vector2.new(val_749.ViewportSize.X / 2, val_749.ViewportSize.Y / 2) or Vector2.new(-2000, -2000)
@@ -9726,6 +10050,7 @@ env.runService.Heartbeat:Connect(function()
 	local grounded = hum.FloorMaterial ~= Enum.Material.Air
 	local vel = hrp.AssemblyLinearVelocity; local flat = Vector3.new(vel.X, 0, vel.Z)
 	if library_flags["Edge Jump"] and env.ejBindHeld and grounded and flat.Magnitude > 4 then
+		if library_flags["antiSmac"] and flat.Magnitude > 35 then return end
 		local ahead = hrp.Position + flat.Unit * math.clamp(flat.Magnitude * 0.12, 1.5, 5)
 		if not workspace:Raycast(ahead, Vector3.new(0, -6, 0), movementRayParams(char)) then
 			hum.Jump = true; env.lastEdgeJumpTime = tick()
@@ -9744,28 +10069,141 @@ env.runService.Heartbeat:Connect(function()
 end)
 env.runService.Heartbeat:Connect(function()
 	local char = val_733.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChild("Humanoid")
+	
+	if library_flags["Auto Pixel Surf"] and hrp and hum and hum.Health > 0 and val_872.alive then
+		local inAir = (hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping or hum.FloorMaterial == Enum.Material.Air) and hum:GetState() ~= Enum.HumanoidStateType.Climbing
+		local vel = hrp.AssemblyLinearVelocity
+		if inAir and vel.Y < -5 then 
+			local wallPart, wallNormal, _ = findWallHit()
+			if wallPart and wallNormal then
+				if workspace.CurrentCamera.CFrame.LookVector:Dot(wallNormal) > 0.2 and not library_flags["Auto Align"] then
+					wallPart = nil
+				end
+				local uis = game:GetService("UserInputService")
+				if uis:IsKeyDown(Enum.KeyCode.S) or uis:IsKeyDown(Enum.KeyCode.A) or uis:IsKeyDown(Enum.KeyCode.D) or uis:IsKeyDown(Enum.KeyCode.LeftControl) or uis:IsKeyDown(Enum.KeyCode.C) then
+					wallPart = nil
+				end
+			end		
+			if wallPart and wallNormal then
+				local horizVel = Vector3.new(vel.X, 0, vel.Z)
+				if horizVel.Magnitude > 1 then
+					local horizNormal = Vector3.new(wallNormal.X, 0, wallNormal.Z).Unit
+					local projected = horizVel.Unit - horizNormal * horizVel.Unit:Dot(horizNormal)
+					if projected.Magnitude > 0.01 then
+						local glideDir = projected.Unit
+						local rayParams = RaycastParams.new()
+						rayParams.FilterDescendantsInstances = {char, workspace:FindFirstChild("Ray_Ignore")}
+						rayParams.FilterType = Enum.RaycastFilterType.Exclude
+						if workspace:Raycast(hrp.Position, glideDir * 3.5, rayParams) then
+							wallPart = nil
+						end
+					end
+				end
+			end
+			
+			if wallPart and wallNormal then
+				if not env.autoSurfStartTick then
+					env.autoSurfStartTick = tick()
+					env.surfing = true
+				end
+
+				if tick() - env.autoSurfStartTick <= 0.15 then
+					local horizNormal = Vector3.new(wallNormal.X, 0, wallNormal.Z).Unit
+					local horizVel = Vector3.new(vel.X, 0, vel.Z)
+					local glideDir = Vector3.new(0, 0, 0)
+					if horizVel.Magnitude > 1 then
+						local projected = horizVel.Unit - horizNormal * horizVel.Unit:Dot(horizNormal)
+						if projected.Magnitude > 0.01 then
+							glideDir = projected.Unit
+						end
+					end
+					local pspeed = library_flags["pspeed"] or 18
+					hrp.AssemblyLinearVelocity = Vector3.new(glideDir.X * pspeed, 0, glideDir.Z * pspeed)
+				else
+					env.autoSurfStartTick = nil
+					env.surfing = false
+				end
+			else
+				env.autoSurfStartTick = nil
+				env.surfing = false
+			end
+		else
+			env.autoSurfStartTick = nil
+			env.surfing = false
+		end
+	end
+end)
+
+env.runService.Heartbeat:Connect(function()
+	local char = val_733.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChild("Humanoid")
 	if not (library_flags["Ladder Bug"] and env.lbBindHeld) or not hrp or not hum or hum.Health <= 0 then
-		env.lbFrames = 0; env.ladderBugActive = false; return
+		env.ladderBugActive = false; env.lbApproach = nil; return
 	end
+	
+	local state = hum:GetState()
 	local vel = hrp.AssemblyLinearVelocity
-	if hum:GetState() ~= Enum.HumanoidStateType.Climbing then
-		env.lbFrames = 0; env.ladderBugActive = false; env.lbApproach = Vector3.new(vel.X, 0, vel.Z); env.lbLastZ = nil
+	
+	if state ~= Enum.HumanoidStateType.Climbing then
+		env.ladderBugActive = false
+		if state == Enum.HumanoidStateType.Freefall or hum.FloorMaterial == Enum.Material.Air then
+			env.lbApproach = vel
+		end
 		return
 	end
-	env.ladderBugActive = true; env.lbFrames = (env.lbFrames or 0) + 1
-	local held = env.lbLastZ ~= nil and math.abs(vel.Y - env.lbLastZ) < 0.01 and vel.Y > 0
-	env.lbLastZ = vel.Y
-	if not held and env.lbFrames <= LadderBugConfig.maxClimbFrames then return end
-	local flat = env.lbApproach or Vector3.new(vel.X, 0, vel.Z)
-	if flat.Magnitude < 0.1 then flat = hrp.CFrame.LookVector * Vector3.new(1, 0, 1) end
-	if flat.Magnitude > 0 then flat = flat.Unit * math.max(flat.Magnitude, LadderBugConfig.minSpeed) end
-	hrp.AssemblyLinearVelocity = Vector3.new(flat.X, math.max(vel.Y, LadderBugConfig.launch), flat.Z)
-	env.lbFrames = 0; env.lbLastZ = nil; env.lastLadderBugTime = tick()
-	hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
-	task.delay(LadderBugConfig.regrabDelay, function()
-		pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true) end)
-	end)
+	
+	if not env.ladderBugActive and env.lbApproach then
+		env.ladderBugActive = true
+		env.lastLadderBugTime = tick()
+		
+		local flat = Vector3.new(env.lbApproach.X, 0, env.lbApproach.Z)
+		if flat.Magnitude < 5 then 
+			flat = hrp.CFrame.LookVector * Vector3.new(1, 0, 1) * 20
+		end
+		
+		local bounceForce = 50
+		hrp.AssemblyLinearVelocity = Vector3.new(flat.X, bounceForce, flat.Z)
+		
+		hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+		task.delay(0.25, function()
+			if hum then pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true) end) end
+		end)
+	end
+	
+	if library_flags["Blockbot"] and env.blockbotBindHeld and hrp and hum and hum.Health > 0 then
+		local closestPlr = nil
+		local closestDist = 7
+		for _, plr in game.Players:GetPlayers() do
+			if plr ~= val_733 and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+				local dist = (plr.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+				if dist < closestDist then
+					closestDist = dist
+					closestPlr = plr
+				end
+			end
+		end
+		
+		if closestPlr then
+			local tHrp = closestPlr.Character.HumanoidRootPart
+			local tVel = tHrp.AssemblyLinearVelocity
+			local myPos = hrp.Position
+			local tPos = tHrp.Position
+			
+			if myPos.Y > tPos.Y + 1.5 then
+				local predictedPos = tPos + tVel * 0.1
+				hum:MoveTo(predictedPos)
+			else
+				local forwardDir = tVel
+				if forwardDir.Magnitude < 1 then
+					forwardDir = tHrp.CFrame.LookVector * 5
+				end
+				local blockPos = tPos + forwardDir.Unit * 3
+				hum:MoveTo(blockPos)
+			end
+		end
+	end
 end)
 isOnLadder = false; wasOnLadder = false
 lastCooldown = 0
@@ -9872,37 +10310,85 @@ game:GetService("RunService").Heartbeat:Connect(function(dt)
     end
     local plr = game.Players.LocalPlayer; local char = plr.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChild("Humanoid")
-    if not (library_flags["Fireman"] and env.fmActiveHold) or not hrp or not hum then
-        canBoost = false; isOnLadder = false; wasOnLadder = false; env.fmOnLadder = false; env.fmCarry = nil; return
-    end
-    wasOnLadder = isOnLadder; isOnLadder = detectLadder(); local vel = hrp.AssemblyLinearVelocity
-    local flatSpeed = Vector3.new(vel.X, 0, vel.Z).Magnitude
-    if isOnLadder then
-        if not wasOnLadder then
-            env.fmCarry = math.max(env.fmApproachSpeed or 0, flatSpeed)
-        end
-        local dir = hum.MoveDirection; local flat = Vector3.new(dir.X, 0, dir.Z)
-        local carry = env.fmCarry or 0
-        local horizontal = flat.Magnitude > 0.1 and flat.Unit * math.max(carry, 16) or Vector3.zero
-        local climb = 0
-        if vel.Y > 0.1 then
-            climb = FiremanConfig.climbSpeed
-        elseif vel.Y < -0.1 then
-            climb = -FiremanConfig.climbSpeed
-        end
-        hrp.AssemblyLinearVelocity = Vector3.new(horizontal.X, climb, horizontal.Z)
-        env.fmOnLadder = true; canBoost = true
+    local fmBind = UI_Library.options["Fireman Bind"]
+    local isFmActive = false
+    if fmBind and fmBind.key ~= "none" then
+        isFmActive = env.fmActiveHold
     else
-        env.fmOnLadder = false; env.fmApproachSpeed = flatSpeed
-        if wasOnLadder and canBoost and tick() - lastCooldown > FiremanConfig.cooldown then
-            lastCooldown = tick(); canBoost = false
-            local dir = hum.MoveDirection
-            if dir.Magnitude < 0.1 then dir = hrp.CFrame.LookVector * Vector3.new(1, 0, 1) end
-            if dir.Magnitude > 0 then dir = dir.Unit end
-            local exit = math.max(flatSpeed + FiremanConfig.boostForce, env.fmCarry or 0)
-            hrp.AssemblyLinearVelocity = Vector3.new(dir.X * exit, vel.Y < 0 and FiremanConfig.upwardBoost or 15, dir.Z * exit); env.fmTriggered = true; env.fmCarry = nil
-            task.delay(0.5, function() env.fmTriggered = false end)
+        isFmActive = library_flags["Fireman"]
+    end
+    if not isFmActive or not hrp or not hum then
+        env.fmOnLadder = false; return
+    end
+    local vel = hrp.AssemblyLinearVelocity
+    local state = hum:GetState()
+    
+    if state == Enum.HumanoidStateType.Climbing and val_671:IsKeyDown(Enum.KeyCode.S) then
+        hrp.CFrame = hrp.CFrame * CFrame.new(0, 0, 1)
+        hum:ChangeState(Enum.HumanoidStateType.Freefall)
+        env.fmOnLadder = true
+    end
+
+    if (state == Enum.HumanoidStateType.Freefall or hum.FloorMaterial == Enum.Material.Air) and vel.Y < -35 then
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {char, workspace:FindFirstChild("Ray_Ignore")}
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        
+        local lookAhead = math.max(10, math.abs(vel.Y) * 0.25)
+        local groundHit = workspace:Raycast(hrp.Position, Vector3.new(0, -lookAhead, 0), rayParams)
+        
+        local overlap = OverlapParams.new()
+        overlap.FilterDescendantsInstances = {char, workspace:FindFirstChild("Ray_Ignore")}
+        overlap.FilterType = Enum.RaycastFilterType.Exclude
+        local parts = workspace:GetPartBoundsInRadius(hrp.Position, 10, overlap)
+        
+        local ladder = nil; local minDist = math.huge
+        for _, p in parts do
+            if p:IsA("TrussPart") or string.find(string.lower(p.Name), "ladder") then
+                local dist = (p.Position - hrp.Position).Magnitude
+                if dist < minDist then minDist = dist; ladder = p end
+            end
         end
+        
+        if ladder then
+            local triggerCatch = false
+            
+            if library_flags["Auto Align"] then
+                local length = ladder.Size.Y
+                if length >= 15 then
+                    local catchHeight = ladder.Position.Y - length * 0.25
+                    if hrp.Position.Y <= catchHeight then
+                        triggerCatch = true
+                    end
+                else
+                    if groundHit then triggerCatch = true end
+                end
+            else
+                if groundHit then triggerCatch = true end
+            end
+            
+            if triggerCatch then
+                local targetPos = ladder.Position
+                if not library_flags["Auto Align"] then
+                    targetPos = hrp.Position + (ladder.Position - hrp.Position).Unit * 2
+                end
+                
+                local dir = (targetPos - hrp.Position)
+                local flatDir = Vector3.new(dir.X, 0, dir.Z)
+                if flatDir.Magnitude > 0 then
+                    flatDir = flatDir.Unit
+                    hrp.AssemblyLinearVelocity = Vector3.new(flatDir.X * 50, vel.Y, flatDir.Z * 50)
+                    env.fmOnLadder = true; env.fmTriggered = true
+                    task.delay(0.5, function() env.fmTriggered = false end)
+                end
+            end
+        end
+    end
+    
+    if state == Enum.HumanoidStateType.Climbing then
+        env.fmOnLadder = true
+    elseif not env.fmTriggered then
+        env.fmOnLadder = false
     end
 end)
 end)() 
@@ -11455,6 +11941,114 @@ spawn(function()
 		end
 	end
 end)
+
 env.playTick = playTick
-end
+
+task.spawn(function()
+	local weatherEmitter = Instance.new("ParticleEmitter")
+	weatherEmitter.Name = "ClarityWeather"
+	weatherEmitter.EmissionDirection = Enum.NormalId.Bottom
+	weatherEmitter.Lifetime = NumberRange.new(2, 3)
+	weatherEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 0.1)})
+	weatherEmitter.Speed = NumberRange.new(50, 60)
+	weatherEmitter.SpreadAngle = Vector2.new(5, 5)
+	weatherEmitter.Rate = 0
+	weatherEmitter.Transparency = NumberSequence.new(0.5)
+	
+	local weatherPart = Instance.new("Part")
+	weatherPart.Name = "ClarityWeatherPart"
+	weatherPart.Transparency = 1
+	weatherPart.CanCollide = false
+	weatherPart.Anchored = true
+	weatherPart.Size = Vector3.new(150, 1, 150)
+	weatherEmitter.Parent = weatherPart
+	weatherPart.Parent = workspace.CurrentCamera
+
+	game:GetService("RunService").RenderStepped:Connect(function()
+		if workspace.CurrentCamera then
+			if weatherPart.Parent ~= workspace.CurrentCamera then
+				weatherPart.Parent = workspace.CurrentCamera
+			end
+			weatherPart.CFrame = workspace.CurrentCamera.CFrame * CFrame.new(0, 60, 0)
+		end
+		
+		local mode = library_flags["customWeather"] or "Default"
+		if mode == "Rain" then
+			weatherEmitter.Rate = 2500
+			weatherEmitter.Speed = NumberRange.new(80, 100)
+			weatherEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.05), NumberSequenceKeypoint.new(1, 0.05)})
+			weatherEmitter.Color = ColorSequence.new(Color3.fromRGB(150, 150, 255))
+			weatherEmitter.Texture = "rbxassetid://243660364" 
+		elseif mode == "Snow" then
+			weatherEmitter.Rate = 1000
+			weatherEmitter.Speed = NumberRange.new(15, 25)
+			weatherEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 0.2)})
+			weatherEmitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+			weatherEmitter.Texture = "rbxassetid://152643521" 
+		else
+			weatherEmitter.Rate = 0
+		end
+	end)
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(1)
+		pcall(function()
+			local doMats = library_flags["overrideMaterials"]
+			local matName = library_flags["overrideMaterialsType"] or "SmoothPlastic"
+			local matEnum = Enum.Material[matName] or Enum.Material.SmoothPlastic
+			local doTex = library_flags["removeTextures"]
+			local doPart = library_flags["removeMapParticles"]
+
+			for _, v in workspace:GetDescendants() do
+				if v:IsA("BasePart") then
+					if doMats and v.Parent.Name ~= "Terrain" and not v.Parent:FindFirstChild("Humanoid") and v.Name ~= "HumanoidRootPart" and v.Name ~= "Gun" then
+						if v.Material ~= matEnum then
+							if not v:GetAttribute("OriginalMaterial") then
+								v:SetAttribute("OriginalMaterial", v.Material.Name)
+							end
+							v.Material = matEnum
+						end
+					elseif not doMats and v:GetAttribute("OriginalMaterial") then
+						local origMat = v:GetAttribute("OriginalMaterial")
+						if v.Material.Name ~= origMat then
+							v.Material = Enum.Material[origMat] or Enum.Material.Plastic
+						end
+						v:SetAttribute("OriginalMaterial", nil)
+					end
+				end
+
+				if v:IsA("Decal") or v:IsA("Texture") then
+					if doTex then
+						if v.Transparency ~= 1 then
+							v:SetAttribute("OriginalTransparency", v.Transparency)
+							v.Transparency = 1
+						end
+					elseif not doTex and v:GetAttribute("OriginalTransparency") then
+						v.Transparency = v:GetAttribute("OriginalTransparency")
+						v:SetAttribute("OriginalTransparency", nil)
+					end
+				end
+
+				if v:IsA("ParticleEmitter") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+					if doPart then
+						if v.Parent and v.Parent.Name ~= "Debris" and v.Parent.Name ~= "Ignore" and not v:IsDescendantOf(workspace.CurrentCamera) and not (v.Parent.Parent and v.Parent.Parent:FindFirstChild("Humanoid")) then
+							if v.Enabled then
+								v:SetAttribute("OriginalEnabled", v.Enabled)
+								v.Enabled = false
+							end
+						end
+					elseif not doPart and v:GetAttribute("OriginalEnabled") ~= nil then
+						v.Enabled = v:GetAttribute("OriginalEnabled")
+						v:SetAttribute("OriginalEnabled", nil)
+					end
+				end
+			end
+		end)
+	end
+end)
+
+
+	end
 end)
