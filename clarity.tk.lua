@@ -1,3 +1,8 @@
+--[[
+    Copyright (C) 2026 Freezewo
+    Licensed under the GNU AGPLv3 License.
+    Official Repository: https://github.com/Freezewo/clarity.tk
+--]]
 do
 	local a = (http and http.request) or request
 	if not isfile("clarity.dat") and a then
