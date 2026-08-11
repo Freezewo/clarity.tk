@@ -169,7 +169,7 @@ local gameConfigs = {
         url = "https://raw.githubusercontent.com/Freezewo/clarity.tk/main/clarity.tk.lua"
     },
     ["killstreak"] = {
-        placeIds = {90184287580174},
+        placeIds = {138485390344924, 90184287580174}, -- game + lobby/hub
         url = "https://raw.githubusercontent.com/Freezewo/PoopHook/main/poophook.lua"
     },
     ["blox strike"] = {
