@@ -65,31 +65,197 @@ function chamsMaterial(name)
 	local map = { Ghost = "ForceField", Flat = "Neon", Custom = "SmoothPlastic", Reflective = "Glass", Metallic = "Glass" }
 	return map[name] or "ForceField"
 end
+
+KNIFE_SKIN_FALLBACK = "M9 Bayonet"
+local cachedSkinMapper = nil
+function getSkinMapper()
+	if cachedSkinMapper == nil then
+		cachedSkinMapper = false
+		local modules = game:GetService("ReplicatedStorage"):FindFirstChild("Modules")
+		local mod = modules and (modules:FindFirstChild("GetAndMap") or modules:FindFirstChild("SkinMapper"))
+		if mod then
+			local ok, res = pcall(require, mod)
+			if ok and type(res) == "table" and type(res.MapSkin) == "function" then
+				cachedSkinMapper = res
+			end
+		end
+	end
+	return cachedSkinMapper or nil
+end
+function skinTextureId(value)
+	if type(value) ~= "string" then return nil end
+	value = value:match("^%s*(.-)%s*$")
+	if value == "" then return nil end
+	local num = tonumber(value)
+	if num then
+		return num > 0 and ("rbxassetid://" .. value) or nil
+	end
+	if value:match("^rbxassetid://0+$") or value:match("[?&]id=0+$") then return nil end
+	return value
+end
+function setSkinTexture(part, tex)
+	local mesh = part:FindFirstChildWhichIsA("SpecialMesh")
+	if mesh then
+		mesh.TextureId = tex
+	elseif part:IsA("MeshPart") then
+		part.TextureID = tex
+	else
+		pcall(function() part.TextureID = tex end)
+	end
+end
+function applySkinFallback(model, skinFolder)
+	local byName = {}
+	local function index(inst)
+		if inst:IsA("BasePart") and inst.Transparency < 1 then
+			byName[inst.Name] = byName[inst.Name] or {}
+			table.insert(byName[inst.Name], inst)
+		end
+	end
+	index(model)
+	for _, d in model:GetDescendants() do index(d) end
+	local sheet = skinFolder:FindFirstChildWhichIsA("Texture")
+	if sheet then
+		for _, parts in byName do
+			for _, part in parts do
+				if not part.Name:find("Arm") and part.Material ~= Enum.Material.Wood then
+					for _, face in { Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Right, Enum.NormalId.Left, Enum.NormalId.Front, Enum.NormalId.Back } do
+						local copy = sheet:Clone(); copy.Face = face; copy.Parent = part
+					end
+				end
+			end
+		end
+		return true
+	end
+	local applied = false
+	for _, entry in skinFolder:GetDescendants() do
+		if entry:IsA("StringValue") and entry.Name ~= "meshtype" and byName[entry.Name] then
+			local tex = skinTextureId(entry.Value)
+			local surface = entry:FindFirstChildWhichIsA("SurfaceAppearance")
+			for _, part in byName[entry.Name] do
+				local old = part:FindFirstChildWhichIsA("SurfaceAppearance")
+				if old then old:Destroy() end
+				if tex then setSkinTexture(part, tex) end
+				if surface then surface:Clone().Parent = part end
+			end
+			applied = applied or tex ~= nil or surface ~= nil
+		end
+	end
+	return applied
+end
+function applyAnimatedSkinFallback(model, skinFolder)
+	local animMod = skinFolder:FindFirstChild("Animated")
+	if not animMod or not animMod:IsA("ModuleScript") then return false end
+	local ok, animData = pcall(require, animMod)
+	if not ok or type(animData) ~= "table" then return false end
+	local delays = animData.delays or 0.1
+	local frames, maxFrame = {}, 0
+	for i = 1, #animData do
+		local frame = skinTextureId(animData[i]) or animData[i]
+		if type(frame) == "string" then
+			frames[i] = frame; maxFrame = i
+		end
+	end
+	if maxFrame == 0 then return false end
+	local targets = {}
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and not part.Name:find("Arm") then
+			table.insert(targets, part)
+		end
+	end
+	if #targets == 0 then return false end
+	task.spawn(function()
+		local idx = 1
+		while model and model.Parent do
+			local frame = frames[idx]
+			if frame then
+				for _, part in targets do
+					if part and part.Parent then setSkinTexture(part, frame) end
+				end
+			end
+			idx = idx + 1; if idx > maxFrame then idx = 1 end
+			task.wait(type(delays) == "number" and delays or (type(delays) == "table" and (delays[idx] or delays[1] or 0.1) or 0.1))
+		end
+	end)
+	return true
+end
+function resolveSkinFolder(weaponName, skinName)
+	if not weaponName or not skinName or skinName == "" or skinName == "Inventory" or skinName == "Stock" then return nil end
+	local skins = game:GetService("ReplicatedStorage"):FindFirstChild("Skins")
+	if not skins then return nil end
+	local weapon = skins:FindFirstChild(weaponName)
+	if not weapon and (weaponName == "CT Knife" or weaponName == "T Knife") then
+		weaponName = KNIFE_SKIN_FALLBACK; weapon = skins:FindFirstChild(weaponName)
+	end
+	local folder = weapon and weapon:FindFirstChild(skinName)
+	if not folder then return nil end
+	return folder, weaponName
+end
+function applyWeaponSkin(model, weaponName, skinName, opts)
+	opts = opts or {}
+	if not model then return false end
+	local skinFolder, resolvedName = resolveSkinFolder(weaponName, skinName)
+	if not skinFolder then return false end
+	local previousName = model.Name
+	model.Name = resolvedName
+	local mapper = getSkinMapper()
+	local mapped = false
+	if mapper then
+		local fn = opts.worldModel and mapper.MapWorldModel or mapper.MapSkin
+		if fn then
+			mapped = pcall(fn, model, skinName, opts.stattrak)
+		end
+	end
+	if not mapped then
+		mapped = applyAnimatedSkinFallback(model, skinFolder)
+	end
+	if not mapped then
+		pcall(applySkinFallback, model, skinFolder)
+	end
+	model.Name = previousName
+	return true
+end
+
+env.jbFallSpeed = 0; env.jbNoFallDamageUntil = 0
+local function jumpbugGroundProbe(hrp, hum, char, reach)
+	local map = workspace:FindFirstChild("Map")
+	if map and map:FindFirstChild("Geometry") and map:FindFirstChild("Clips") then
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { map.Geometry, map.Clips }
+		params.IgnoreWater = false
+		return workspace:Raycast(hrp.Position, Vector3.new(0, -reach, 0), params)
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { char, workspace:FindFirstChild("Debris"), workspace:FindFirstChild("Ray_Ignore") }
+	params.IgnoreWater = true
+	return workspace:Raycast(hrp.Position, Vector3.new(0, -reach, 0), params)
+end
 env.runService.Stepped:Connect(function(_, dt)
 	if not (library_flags and library_flags["Jumpbug"] and env.jbBindHeld) then
-		env.jbHoldUntil = 0; return
+		env.jbFallSpeed = 0; return
 	end
 	local char = game:GetService("Players").LocalPlayer.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if not hrp or not hum or hum.Health <= 0 then return end
-	local gravity = workspace.Gravity; local now = tick(); local vel = hrp.AssemblyLinearVelocity
-	local grounded = hum.FloorMaterial ~= Enum.Material.Air
-	local uis = game:GetService("UserInputService")
-	local spaceDown = not uis:GetFocusedTextBox() and uis:IsKeyDown(Enum.KeyCode.Space)
-	local pressed = spaceDown and not env.jbSpacePrev; env.jbSpacePrev = spaceDown
-	if grounded and pressed and now >= (env.jbHoldUntil or 0) and now - (env.jbFired or 0) > 0.35 then
-		env.jbFired = now; env.jbExpectedY = math.sqrt(2 * gravity * GAME_JUMP_HEIGHT * (library_flags["jbHeight"] or 4))
-		env.jbHoldUntil = now + 1; env.jbLastY = hrp.Position.Y; env.lastJumpbugTime = now
-		hrp.AssemblyLinearVelocity = Vector3.new(vel.X, env.jbExpectedY, vel.Z)
-	elseif now < (env.jbHoldUntil or 0) then
-		env.jbExpectedY = (env.jbExpectedY or 0) - gravity * dt
-		local rising = hrp.Position.Y > (env.jbLastY or 0) + 0.01; env.jbLastY = hrp.Position.Y
-		if env.jbExpectedY <= 0 or (not rising and vel.Y <= 0) then
-			env.jbHoldUntil = 0
-		elseif vel.Y < env.jbExpectedY - 0.5 then
-			hrp.AssemblyLinearVelocity = Vector3.new(vel.X, env.jbExpectedY, vel.Z)
-		end
+	if not hrp or not hum or hum.Health <= 0 then
+		env.jbFallSpeed = 0; return
 	end
+	local now = tick(); local vel = hrp.AssemblyLinearVelocity
+	if hum.FloorMaterial ~= Enum.Material.Air then
+		env.jbFallSpeed = 0; return
+	end
+	if vel.Y < 0 then
+		env.jbFallSpeed = math.max(env.jbFallSpeed or 0, -vel.Y)
+	end
+	local fallSpeed = env.jbFallSpeed or 0
+	if fallSpeed < 1 or vel.Y > 0 or now - (env.jbFired or 0) < 0.2 then return end
+	local reach = hum.HipHeight + hrp.Size.Y / 2 + 0.1 + fallSpeed * math.max(dt, 1 / 240)
+	if not jumpbugGroundProbe(hrp, hum, char, reach) then return end
+	local jumpVel = hum.UseJumpPower and hum.JumpPower or math.sqrt(2 * workspace.Gravity * (hum.JumpHeight > 0 and hum.JumpHeight or GAME_JUMP_HEIGHT))
+	env.jbFired = now; env.lastJumpbugTime = now; env.jbNoFallDamageUntil = now + 1
+	hum:ChangeState(Enum.HumanoidStateType.Jumping)
+	hrp.AssemblyLinearVelocity = Vector3.new(vel.X, jumpVel + fallSpeed, vel.Z)
+	env.jbFallSpeed = 0
 end)
 for _, conn in { "mimicStateConn", "jumpConn", "ebRedirConn", "thirdPersonConn" } do
 	if env[conn] then pcall(function() env[conn]:Disconnect() end) end
@@ -1640,14 +1806,15 @@ function updateViewModelVisuals()
 					if var_141.Name == "StatClock" then
 						var_141:ClearAllChildren()
 					end 
+					local skinActive = library_flags["skinSkinChanger"] or library_flags["skinKnifeChanger"]
 					var_141.Color = library_flags["weaponColor"]; var_141.Transparency = 1 - UI_Library.options["weaponColor"].trans; var_141.Material = chamsMaterial(library_flags["weaponMaterial"])
-					if hasProperty(var_141, "TextureID") then
+					if not skinActive and hasProperty(var_141, "TextureID") then
 						var_141.TextureID = library_flags["weaponMaterial"] == "Ghost" and GHOST_TEXTURE or ""
 					end 
 					if hasProperty(var_141, "Reflectance") then
 						var_141.Reflectance = library_flags["weaponReflectance"] / 50
 					end 
-					if var_141:FindFirstChild("SurfaceAppearance") then
+					if not skinActive and var_141:FindFirstChild("SurfaceAppearance") then
 						var_141.SurfaceAppearance:Destroy()
 					end
 				end 
@@ -2484,7 +2651,7 @@ end
 do
 	local val_946 = Instance.new("ScreenGui"); val_948 = Instance.new("Frame"); val_948.Name = "SpectatorList"; env.SpectatorList = val_948; local val_958 = Instance.new("TextLabel"); local val_962 = Instance.new("Frame"); local val_965 = Instance.new("UIListLayout"); val_946.Enabled = true; val_946.Parent = val_733.PlayerGui; val_948.Visible = false; val_948.Parent = val_946; val_948.BackgroundColor3 = Color3.fromRGB(0, 0, 0); val_948.BackgroundTransparency = 0; val_948.BorderSizePixel = 0; val_948.Position = UDim2.new(0, 15, 0.45, 0); val_948.Size = UDim2.new(0, 200, 0, 50)
 	val_948.ClipsDescendants = true
-	local L_83_Corner = Instance.new("UICorner"); L_83_Corner.CornerRadius = UDim.new(0, 3); L_83_Corner.Parent = val_948; local L_83_Stroke = Instance.new("UIStroke"); L_83_Stroke.Thickness = 1; L_83_Stroke.Color = Color3.fromRGB(65, 65, 65); L_83_Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; L_83_Stroke.Parent = val_948; local L_83_Extras = Instance.new("Folder"); L_83_Extras.Name = "Extras"; L_83_Extras.Parent = val_948; local L_83_OuterOutline = Instance.new("Frame"); L_83_OuterOutline.Name = "Outline"; L_83_OuterOutline.Size = UDim2.new(1, 2, 1, 2); L_83_OuterOutline.Position = UDim2.new(0, -1, 0, -1); L_83_OuterOutline.BackgroundTransparency = 1; L_83_OuterOutline.ZIndex = val_948.ZIndex - 1; L_83_OuterOutline.Parent = L_83_Extras; local L_83_OuterCorner = Instance.new("UICorner"); L_83_OuterCorner.CornerRadius = UDim.new(0, 4); L_83_OuterCorner.Parent = L_83_OuterOutline; local L_83_OuterStroke = Instance.new("UIStroke"); L_83_OuterStroke.Thickness = 1; L_83_OuterStroke.Color = Color3.new(0, 0, 0); L_83_OuterStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; L_83_OuterStroke.Parent = L_83_OuterOutline; val_965.Parent = val_948; val_965.SortOrder = Enum.SortOrder.LayoutOrder; val_965.HorizontalAlignment = Enum.HorizontalAlignment.Left; val_965.Padding = UDim.new(0, 4); local SpecPadding = Instance.new("UIPadding"); SpecPadding.PaddingTop = UDim.new(0, 8); SpecPadding.PaddingBottom = UDim.new(0, 8); SpecPadding.PaddingLeft = UDim.new(0, 11); SpecPadding.PaddingRight = UDim.new(0, 11); SpecPadding.Parent = val_948; val_958.Parent = val_948; val_958.BackgroundTransparency = 1; val_958.BorderSizePixel = 0; val_958.Size = UDim2.new(1, 0, 0, 13); val_958.Font = Enum.Font.Code; val_958.Text = "spectators"; val_958.TextColor3 = Color3.new(1, 1, 1); val_958.TextSize = 13; val_958.TextXAlignment = Enum.TextXAlignment.Center; val_958.LayoutOrder = 1; NoSpecLabel = Instance.new("TextLabel"); NoSpecLabel.Name = "NoSpecLabel"; NoSpecLabel.BackgroundTransparency = 1; NoSpecLabel.Size = UDim2.new(1, 0, 0, 13); NoSpecLabel.Font = Enum.Font.Code; NoSpecLabel.Text = "no spectators"; NoSpecLabel.TextColor3 = Color3.fromRGB(150, 150, 150); NoSpecLabel.TextSize = 13; NoSpecLabel.TextXAlignment = Enum.TextXAlignment.Left; NoSpecLabel.LayoutOrder = 2; NoSpecLabel.Parent = val_948
+	local L_83_Corner = Instance.new("UICorner"); L_83_Corner.CornerRadius = UDim.new(0, 3); L_83_Corner.Parent = val_948; local L_83_Stroke = Instance.new("UIStroke"); L_83_Stroke.Thickness = 1; L_83_Stroke.Color = Color3.fromRGB(65, 65, 65); L_83_Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; L_83_Stroke.Parent = val_948; local L_83_Extras = Instance.new("Folder"); L_83_Extras.Name = "Extras"; L_83_Extras.Parent = val_948; local L_83_OuterOutline = Instance.new("Frame"); L_83_OuterOutline.Name = "Outline"; L_83_OuterOutline.Size = UDim2.new(1, 2, 1, 2); L_83_OuterOutline.Position = UDim2.new(0, -1, 0, -1); L_83_OuterOutline.BackgroundTransparency = 1; L_83_OuterOutline.ZIndex = val_948.ZIndex - 1; L_83_OuterOutline.Parent = L_83_Extras; local L_83_OuterCorner = Instance.new("UICorner"); L_83_OuterCorner.CornerRadius = UDim.new(0, 4); L_83_OuterCorner.Parent = L_83_OuterOutline; local L_83_OuterStroke = Instance.new("UIStroke"); L_83_OuterStroke.Thickness = 1; L_83_OuterStroke.Color = Color3.new(0, 0, 0); L_83_OuterStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; L_83_OuterStroke.Parent = L_83_OuterOutline; val_965.Parent = val_948; val_965.SortOrder = Enum.SortOrder.LayoutOrder; val_965.HorizontalAlignment = Enum.HorizontalAlignment.Left; val_965.Padding = UDim.new(0, 4); local SpecPadding = Instance.new("UIPadding"); SpecPadding.PaddingTop = UDim.new(0, 8); SpecPadding.PaddingBottom = UDim.new(0, 8); SpecPadding.PaddingLeft = UDim.new(0, 11); SpecPadding.PaddingRight = UDim.new(0, 11); SpecPadding.Parent = val_948; val_958.Parent = val_948; val_958.BackgroundTransparency = 1; val_958.BorderSizePixel = 0; val_958.Size = UDim2.new(1, 0, 0, 13); val_958.Font = Enum.Font.Code; val_958.Text = "spectators"; val_958.TextColor3 = Color3.new(1, 1, 1); val_958.TextSize = 13; val_958.TextXAlignment = Enum.TextXAlignment.Left; val_958.LayoutOrder = 1; NoSpecLabel = Instance.new("TextLabel"); NoSpecLabel.Name = "NoSpecLabel"; NoSpecLabel.BackgroundTransparency = 1; NoSpecLabel.Size = UDim2.new(1, 0, 0, 13); NoSpecLabel.Font = Enum.Font.Code; NoSpecLabel.Text = "no spectators"; NoSpecLabel.TextColor3 = Color3.fromRGB(150, 150, 150); NoSpecLabel.TextSize = 13; NoSpecLabel.TextXAlignment = Enum.TextXAlignment.Left; NoSpecLabel.LayoutOrder = 2; NoSpecLabel.Parent = val_948
 	pcall(function() val_962:Destroy() end)
 end
 function addSpectator(name)
@@ -2514,7 +2681,65 @@ function removeSpectators()
 	end
 	NoSpecLabel.Visible = true; val_948.Size = UDim2.new(0, 200, 0, 50)
 end 
-val_969 = Instance.new("Frame"); val_969.Name = "KeybindsList"; env.KeybindsList = val_969; val_971 = Instance.new("TextLabel"); val_972 = Instance.new("Frame"); val_976 = Instance.new("UIListLayout"); val_969.Visible = false 
+val_969 = Instance.new("Frame"); val_969.Name = "KeybindsList"; env.KeybindsList = val_969; val_971 = Instance.new("TextLabel"); val_972 = Instance.new("Frame"); val_976 = Instance.new("UIListLayout"); val_969.Visible = false
+do
+	local kbGui = Instance.new("ScreenGui"); kbGui.Name = "ClarityKeybinds"; kbGui.ResetOnSpawn = false; kbGui.IgnoreGuiInset = true; kbGui.Enabled = true; kbGui.Parent = val_733.PlayerGui
+	val_969.Parent = kbGui; val_969.BackgroundColor3 = Color3.fromRGB(0, 0, 0); val_969.BackgroundTransparency = 0; val_969.BorderSizePixel = 0; val_969.Position = UDim2.new(1, -215, 0.45, 0); val_969.Size = UDim2.new(0, 200, 0, 50)
+	val_969.ClipsDescendants = true
+	local kbCorner = Instance.new("UICorner", val_969); kbCorner.CornerRadius = UDim.new(0, 3)
+	local kbStroke = Instance.new("UIStroke", val_969); kbStroke.Thickness = 1; kbStroke.Color = Color3.fromRGB(65, 65, 65); kbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	local kbPad = Instance.new("UIPadding", val_969); kbPad.PaddingTop = UDim.new(0, 8); kbPad.PaddingBottom = UDim.new(0, 8); kbPad.PaddingLeft = UDim.new(0, 11); kbPad.PaddingRight = UDim.new(0, 11)
+	val_976.Parent = val_969; val_976.SortOrder = Enum.SortOrder.LayoutOrder; val_976.HorizontalAlignment = Enum.HorizontalAlignment.Left; val_976.Padding = UDim.new(0, 4)
+	val_971.Parent = val_969; val_971.BackgroundTransparency = 1; val_971.BorderSizePixel = 0; val_971.Size = UDim2.new(1, 0, 0, 13); val_971.Font = Enum.Font.Code; val_971.Text = "keybinds"; val_971.TextColor3 = Color3.new(1, 1, 1); val_971.TextSize = 13; val_971.TextXAlignment = Enum.TextXAlignment.Left; val_971.LayoutOrder = 1
+	val_972.Name = "Entries"; val_972.Parent = val_969; val_972.BackgroundTransparency = 1; val_972.Size = UDim2.new(1, 0, 0, 0); val_972.AutomaticSize = Enum.AutomaticSize.Y; val_972.LayoutOrder = 2
+	local kbEntriesLayout = Instance.new("UIListLayout", val_972); kbEntriesLayout.SortOrder = Enum.SortOrder.LayoutOrder; kbEntriesLayout.Padding = UDim.new(0, 3)
+	local NoBindLabel = Instance.new("TextLabel", val_972); NoBindLabel.Name = "NoBindLabel"; NoBindLabel.BackgroundTransparency = 1; NoBindLabel.Size = UDim2.new(1, 0, 0, 13); NoBindLabel.Font = Enum.Font.Code; NoBindLabel.Text = "no active binds"; NoBindLabel.TextColor3 = Color3.fromRGB(150, 150, 150); NoBindLabel.TextSize = 13; NoBindLabel.TextXAlignment = Enum.TextXAlignment.Left; NoBindLabel.LayoutOrder = 1
+	env.refreshKeybindList = function()
+		for _, child in val_972:GetChildren() do
+			if child:IsA("TextLabel") and child.Name ~= "NoBindLabel" then child:Destroy() end
+		end
+		local count = 0
+		for flag, opt in UI_Library.options or {} do
+			if type(opt) == "table" and (opt.type == "bind" or opt.type == "keybind") and opt.key and opt.key ~= "none" and library_flags[flag] then
+				count = count + 1; NoBindLabel.Visible = false
+				local row = Instance.new("TextLabel", val_972); row.BackgroundTransparency = 1; row.Size = UDim2.new(1, 0, 0, 14); row.Font = Enum.Font.Code; row.TextSize = 13; row.TextXAlignment = Enum.TextXAlignment.Left; row.TextColor3 = Color3.fromRGB(200, 200, 200)
+				local bindName = shortenBindName and shortenBindName(opt.key) or tostring(opt.key)
+				row.Text = tostring(opt.text or opt.flag or flag):lower() .. "  [" .. bindName:lower() .. "]"; row.LayoutOrder = count + 1
+			end
+		end
+		if count == 0 then NoBindLabel.Visible = true end
+		val_969.Size = UDim2.new(0, 200, 0, 30 + math.max(count, 1) * 16)
+	end
+end
+do
+	local kbGui = Instance.new("ScreenGui"); kbGui.Name = "ClarityKeybinds"; kbGui.ResetOnSpawn = false; kbGui.IgnoreGuiInset = true; kbGui.Enabled = true; kbGui.Parent = val_733.PlayerGui
+	val_969.Parent = kbGui; val_969.BackgroundColor3 = Color3.fromRGB(0, 0, 0); val_969.BackgroundTransparency = 0; val_969.BorderSizePixel = 0; val_969.Position = UDim2.new(1, -215, 0.45, 0); val_969.Size = UDim2.new(0, 200, 0, 50)
+	val_969.ClipsDescendants = true
+	local kbCorner = Instance.new("UICorner", val_969); kbCorner.CornerRadius = UDim.new(0, 3)
+	local kbStroke = Instance.new("UIStroke", val_969); kbStroke.Thickness = 1; kbStroke.Color = Color3.fromRGB(65, 65, 65); kbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	local kbPad = Instance.new("UIPadding", val_969); kbPad.PaddingTop = UDim.new(0, 8); kbPad.PaddingBottom = UDim.new(0, 8); kbPad.PaddingLeft = UDim.new(0, 11); kbPad.PaddingRight = UDim.new(0, 11)
+	val_976.Parent = val_969; val_976.SortOrder = Enum.SortOrder.LayoutOrder; val_976.HorizontalAlignment = Enum.HorizontalAlignment.Left; val_976.Padding = UDim.new(0, 4)
+	val_971.Parent = val_969; val_971.BackgroundTransparency = 1; val_971.BorderSizePixel = 0; val_971.Size = UDim2.new(1, 0, 0, 13); val_971.Font = Enum.Font.Code; val_971.Text = "keybinds"; val_971.TextColor3 = Color3.new(1, 1, 1); val_971.TextSize = 13; val_971.TextXAlignment = Enum.TextXAlignment.Left; val_971.LayoutOrder = 1
+	val_972.Name = "Entries"; val_972.Parent = val_969; val_972.BackgroundTransparency = 1; val_972.Size = UDim2.new(1, 0, 0, 0); val_972.AutomaticSize = Enum.AutomaticSize.Y; val_972.LayoutOrder = 2
+	local kbEntriesLayout = Instance.new("UIListLayout", val_972); kbEntriesLayout.SortOrder = Enum.SortOrder.LayoutOrder; kbEntriesLayout.Padding = UDim.new(0, 3)
+	local NoBindLabel = Instance.new("TextLabel", val_972); NoBindLabel.Name = "NoBindLabel"; NoBindLabel.BackgroundTransparency = 1; NoBindLabel.Size = UDim2.new(1, 0, 0, 13); NoBindLabel.Font = Enum.Font.Code; NoBindLabel.Text = "no active binds"; NoBindLabel.TextColor3 = Color3.fromRGB(150, 150, 150); NoBindLabel.TextSize = 13; NoBindLabel.TextXAlignment = Enum.TextXAlignment.Left; NoBindLabel.LayoutOrder = 1
+	env.refreshKeybindList = function()
+		for _, child in val_972:GetChildren() do
+			if child:IsA("TextLabel") and child.Name ~= "NoBindLabel" then child:Destroy() end
+		end
+		local count = 0
+		for flag, opt in UI_Library.options or {} do
+			if type(opt) == "table" and (opt.type == "bind" or opt.type == "keybind") and opt.key and opt.key ~= "none" and library_flags[flag] then
+				count = count + 1; NoBindLabel.Visible = false
+				local row = Instance.new("TextLabel", val_972); row.BackgroundTransparency = 1; row.Size = UDim2.new(1, 0, 0, 14); row.Font = Enum.Font.Code; row.TextSize = 13; row.TextXAlignment = Enum.TextXAlignment.Left; row.TextColor3 = Color3.fromRGB(200, 200, 200)
+				local bindName = shortenBindName and shortenBindName(opt.key) or tostring(opt.key)
+				row.Text = tostring(opt.text or opt.flag or flag):lower() .. "  [" .. bindName:lower() .. "]"; row.LayoutOrder = count + 1
+			end
+		end
+		if count == 0 then NoBindLabel.Visible = true end
+		val_969.Size = UDim2.new(0, 200, 0, 30 + math.max(count, 1) * 16)
+	end
+end
 val_978 = {}; val_980 = {}; val_981 = {}; val_982 = { { "TKnife_Stock" }, { "CTKnife_Stock" } }; val_989 = { { "TGlove_Stock" }, { "CTGlove_Stock" } }; val_995 = {}
 pcall(function()
 	for var_255, var_151 in game.Players.LocalPlayer.PlayerGui.Client.Rarities:GetChildren() do
@@ -2603,9 +2828,11 @@ spawn(function()
 	end)
 	oldNamecall = hookmetamethod(game, "__namecall", function(var_270, ...)
 		local val_437 = { ... }; local val_438 = getnamecallmethod(); local val_439 = var_270.Name
-		if val_438 == "ChangeState" and library_flags["Jumpbug"] and env.jbBindHeld and not checkcaller() and val_437[1] == Enum.HumanoidStateType.Landed and var_270:IsA("Humanoid") then
-			local root = var_270.Parent and var_270.Parent:FindFirstChild("HumanoidRootPart")
-			if root and root.AssemblyLinearVelocity.Y > 5 then return end
+		if val_438 == "ChangeState" and not checkcaller() and val_437[1] == Enum.HumanoidStateType.Landed and var_270:IsA("Humanoid") then
+			if (library_flags["Jumpbug"] and env.jbBindHeld) or tick() < (env.jbNoFallDamageUntil or 0) then
+				local root = var_270.Parent and var_270.Parent:FindFirstChild("HumanoidRootPart")
+				if root and root.AssemblyLinearVelocity.Y > 5 then return end
+			end
 		end
 		if val_439 == "Hallooooooooooooo" or val_439 == "Boogers" then
 			if val_438 == "FireServer" or val_438 == "FireUnreliable" or val_438 == "InvokeServer" then
@@ -2694,7 +2921,7 @@ function val_440:GetTabs()
 			if val_439 == "RemoteE65vent" and typeof(val_437[1]) == "table" and val_437[1][1] == "ki8ck" then
 				return
 			end 
-			if val_439 == "FallDamage" and val_423["No Fall Damage"] then
+			if val_439 == "FallDamage" and (val_423["No Fall Damage"] or tick() < (env.jbNoFallDamageUntil or 0)) then
 				return
 			end 
 			if val_439 == "ohnoflames" and val_423["No Fire Damage"] then
@@ -3708,7 +3935,7 @@ miscMovement:AddToggle({
 	callback = function()
 	end
 })
-miscMovement:AddList({ text = "Bunny Hop Method", flag = "Bunny Hop Method", values = {"Directional", "A/D"}, value = "A/D" }); miscMovement:AddSlider({ text = "Bunny Hop Speed", min = 18, max = 100, flag = "Speed Value" }); miscIndicators = miscColumn2:AddSection"Indicators"; miscIndicators:AddToggle({ text = "Drawing Enabled" }); miscIndicators:AddToggle({ text = "Velocity Indicator", flag = "Velocity Indicator" }); miscIndicators:AddToggle({ text = "Pixel Surf Indicator", flag = "showPSInd" }); miscIndicators:AddToggle({ text = "Long Jump Indicator", flag = "showLJInd" }); miscIndicators:AddToggle({ text = "Edgebug Indicator", flag = "showEBInd" }); miscIndicators:AddToggle({ text = "Jumpbug Indicator", flag = "showJBInd" }); miscIndicators:AddToggle({ text = "Airstuck Indicator", flag = "showASInd" }); miscIndicators:AddToggle({ text = "Texturebug Indicator", flag = "showTBInd" }); miscIndicators:AddToggle({ text = "Minijump Indicator", flag = "showMJInd" }); miscIndicators:AddToggle({ text = "Fireman Indicator", flag = "showFMInd" }); miscIndicators:AddToggle({ text = "Jetpack Indicator", flag = "showJPInd" }); miscIndicators:AddToggle({ text = "Wallclimb Indicator", flag = "showWCInd" }); miscIndicators:AddToggle({ text = "Ladderbug Indicator", flag = "showLBInd" }); miscIndicators:AddList({ text = "Indicator Font", flag = "indFont", values = { "UI", "System", "Plex", "Monospace" } }); miscIndicators:AddSlider({ text = "Indicator Size", flag = "indSize", min = 12, max = 30, value = 18 }); motionSettings = miscColumn2:AddSection"Movement Settings"; motionSettings:AddSlider({ text = "Jetpack Speed", flag = "jetpackSpeed", min = 10, max = 100, value = 35 }); motionSettings:AddSlider({ text = "Jumpbug Height", min = 1, max = 6, float = 0.5, flag = "jbHeight", value = 4, suffix = "x" }); motionSettings:AddSlider({ text = "Minijump Mult", min = 0.3, max = 0.8, float = 0.1, flag = "mjMult", value = 0.5 }); motionSettings:AddSlider({ text = "Pixel Surf Speed", min = 18, max = 200, value = 25, flag = "pspeed" }); motionSettings:AddSlider({ text = "Long Jump Studs", min = 1, max = 10, value = 1, suffix = "st", flag = "longJumpStuds" })
+miscMovement:AddList({ text = "Bunny Hop Method", flag = "Bunny Hop Method", values = {"Directional", "A/D"}, value = "A/D" }); miscMovement:AddSlider({ text = "Bunny Hop Speed", min = 18, max = 100, flag = "Speed Value" }); miscIndicators = miscColumn2:AddSection"Indicators"; miscIndicators:AddToggle({ text = "Drawing Enabled" }); miscIndicators:AddToggle({ text = "Velocity Indicator", flag = "Velocity Indicator" }); miscIndicators:AddToggle({ text = "Pixel Surf Indicator", flag = "showPSInd" }); miscIndicators:AddToggle({ text = "Long Jump Indicator", flag = "showLJInd" }); miscIndicators:AddToggle({ text = "Edgebug Indicator", flag = "showEBInd" }); miscIndicators:AddToggle({ text = "Jumpbug Indicator", flag = "showJBInd" }); miscIndicators:AddToggle({ text = "Airstuck Indicator", flag = "showASInd" }); miscIndicators:AddToggle({ text = "Texturebug Indicator", flag = "showTBInd" }); miscIndicators:AddToggle({ text = "Minijump Indicator", flag = "showMJInd" }); miscIndicators:AddToggle({ text = "Fireman Indicator", flag = "showFMInd" }); miscIndicators:AddToggle({ text = "Jetpack Indicator", flag = "showJPInd" }); miscIndicators:AddToggle({ text = "Wallclimb Indicator", flag = "showWCInd" }); miscIndicators:AddToggle({ text = "Ladderbug Indicator", flag = "showLBInd" }); miscIndicators:AddList({ text = "Indicator Font", flag = "indFont", values = { "UI", "System", "Plex", "Monospace" } }); miscIndicators:AddSlider({ text = "Indicator Size", flag = "indSize", min = 12, max = 30, value = 18 }); motionSettings = miscColumn2:AddSection"Movement Settings"; motionSettings:AddSlider({ text = "Jetpack Speed", flag = "jetpackSpeed", min = 10, max = 100, value = 35 }); motionSettings:AddSlider({ text = "Minijump Mult", min = 0.3, max = 0.8, float = 0.1, flag = "mjMult", value = 0.5 }); motionSettings:AddSlider({ text = "Pixel Surf Speed", min = 18, max = 200, value = 25, flag = "pspeed" }); motionSettings:AddSlider({ text = "Long Jump Studs", min = 1, max = 10, value = 1, suffix = "st", flag = "longJumpStuds" })
 motionSettings:AddToggle({ text = "Auto Edge Bug" }); motionSettings:AddToggle({ text = "Auto Pixel Surf", flag = "Auto Pixel Surf" }); motionSettings:AddToggle({ text = "Auto Align", flag = "Auto Align" }); motionSettings:AddList({ text = "Edgebug Mode", flag = "Edgebug Mode", values = {"mimic", "redirectional", "helltracing"}, value = "redirectional" }); motionSettings:AddToggle({ text = "Edgebug Visualizer", flag = "showEBVis" }); motionSettings:AddToggle({ text = "Edgebug Logs", flag = "showEBLogs" }); motionSettings:AddToggle({ text = "Edgebug Badge", flag = "Edgebug Badge" }); blindParts = { "FakeHead", "Gun", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm" }; movementFeatures = miscColumn:AddSection"Movement Features"; val_412 = val_749.ViewportSize.Y - 50; val_436 = Drawing.new("Text"); val_436.Center = true; val_436.Outline = true; val_436.Color = Color3.new(1, 1, 1); val_436.Font = 3; val_436.Size = 20; val_436.Visible = false; oldWalk = val_757.walkupdate; oldSpeedUpdate = val_757.speedupdate
 
 CreateThread(function()
@@ -4007,7 +4234,7 @@ movementFeatures:AddToggle({
 }):AddBind({
 	key = "none", mode = "hold",
 	callback = function(bool)
-		env.jbBindHeld = not bool
+		env.jbBindHeld = bool
 	end
 })
 movementFeatures:AddToggle({
@@ -5672,152 +5899,27 @@ function UI_Library:RefreshList(dropdown, newValues)
 							if selectedSkin and selectedSkin ~= "Inventory" then
 								local SkinData = Skins[gunname]:FindFirstChild(selectedSkin)
 								if SkinData then
-									local function applySkinToPart(targetPart)
-										local n = targetPart.Name:lower()
-										if n:match("^right arm") or n:match("^left arm") or n:match("sleeve") or n:match("glove") or n:match("^right hand") or n:match("^left hand") then return end
-										if targetPart:IsA("BasePart") or targetPart:IsA("MeshPart") then
-											local tex = nil; local wm = SkinData:FindFirstChild("WorldModel")
-											for _, Data in SkinData:GetDescendants() do
-												if wm and Data:IsDescendantOf(wm) then continue end
-												local cleanDataName = Data.Name:gsub("^#%s*", "")
-												if cleanDataName == targetPart.Name or string.match(cleanDataName, "^" .. targetPart.Name .. "%d*$") or (targetPart.Name == "Main" and (cleanDataName == "Part1" or cleanDataName == "Part")) then
-													if Data:IsA("StringValue") then tex = Data.Value
-													elseif Data:IsA("MeshPart") then tex = Data.TextureID
-													elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-													elseif Data:IsA("SurfaceAppearance") then tex = Data end
-													if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-												end
-											end
-											if not tex or tex == "" then
-												for _, Data in SkinData:GetDescendants() do
-													if wm and Data:IsDescendantOf(wm) then continue end
-													local cleanDataName = Data.Name:gsub("^#%s*", "")
-													if cleanDataName == "Handle" and (targetPart.Name == "Blade" or targetPart.Name == "Main") then
-														if Data:IsA("StringValue") then tex = Data.Value
-														elseif Data:IsA("MeshPart") then tex = Data.TextureID
-														elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-														elseif Data:IsA("SurfaceAppearance") then tex = Data end
-														if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-													end
-												end
-											end
-											if not tex or tex == "" then
-												if wm then
-													for _, Data in wm:GetDescendants() do
-														local cleanDataName = Data.Name:gsub("^#%s*", "")
-														if cleanDataName == targetPart.Name or string.match(cleanDataName, "^" .. targetPart.Name .. "%d*$") or (targetPart.Name == "Main" and (cleanDataName == "Part1" or cleanDataName == "Part")) then
-															if Data:IsA("StringValue") then tex = Data.Value
-															elseif Data:IsA("MeshPart") then tex = Data.TextureID
-															elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-															elseif Data:IsA("SurfaceAppearance") then tex = Data end
-															if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-														end
-													end
-												end
-											end
-											if not tex or tex == "" then
-												if wm then
-													for _, Data in wm:GetDescendants() do
-														local cleanDataName = Data.Name:gsub("^#%s*", "")
-														if cleanDataName == "Handle" and (targetPart.Name == "Blade" or targetPart.Name == "Main") then
-															if Data:IsA("StringValue") then tex = Data.Value
-															elseif Data:IsA("MeshPart") then tex = Data.TextureID
-															elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-															elseif Data:IsA("SurfaceAppearance") then tex = Data end
-															if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-														end
-													end
-												end
-											end
-											local isAnimated = SkinData:FindFirstChild("Animated", true)
-											if (not tex or tex == "") and not isAnimated then
-												for _, Data in wm and wm:GetDescendants() or SkinData:GetDescendants() do
-													local lowerName = Data.Name:lower()
-													if not lowerName:match("normal") and not lowerName:match("pbr") and not lowerName:match("roughness") and not lowerName:match("specular") and not lowerName:match("metallic") then
-														local isAssetId = Data:IsA("StringValue") and (Data.Value:match("rbxassetid://") or (tonumber(Data.Value) ~= nil and string.len(Data.Value) >= 5))
-														if Data:IsA("StringValue") and isAssetId and Data.Value ~= "rbxassetid://0" then tex = Data.Value
-														elseif Data:IsA("MeshPart") and Data.TextureID ~= "" and Data.TextureID ~= "rbxassetid://0" then tex = Data.TextureID
-														elseif (Data:IsA("Decal") or Data:IsA("Texture")) and Data.Texture ~= "" and Data.Texture ~= "rbxassetid://0" then tex = Data.Texture
-														elseif Data:IsA("SurfaceAppearance") then tex = Data end
-														if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-													end
-												end
-											end
-											local animData = nil; local pbr = SkinData:FindFirstChild("PBR")
-											if pbr and pbr:FindFirstChild("Animated") then animData = pbr.Animated
-											else animData = SkinData:FindFirstChild("Animated", true) end
-											if animData and animData:IsA("ModuleScript") and targetPart.Transparency ~= 1 then
-												local delays
-												pcall(function() delays = require(animData).delays end)
-												if delays then
-													local frames, maxFrame = {}, 0
-													for _, child in animData:GetChildren() do
-														local frameNum = tonumber(child.Name)
-														if frameNum then
-															local frameTex = nil
-															if child:IsA("StringValue") and child.Value ~= "" and child.Value ~= "rbxassetid://0" then frameTex = child.Value
-															elseif child:IsA("MeshPart") and child.TextureID ~= "" and child.TextureID ~= "rbxassetid://0" then frameTex = child.TextureID
-															elseif (child:IsA("Decal") or child:IsA("Texture")) and child.Texture ~= "" and child.Texture ~= "rbxassetid://0" then frameTex = child.Texture
-															elseif child:IsA("SurfaceAppearance") then frameTex = child end
-															if frameTex then
-																frames[frameNum] = frameTex
-																if frameNum > maxFrame then maxFrame = frameNum end
-															end
-														end
-													end
-													if maxFrame > 0 then
-														task.spawn(function()
-															while targetPart and targetPart.Parent do
-																for i = 1, maxFrame do
-																	if not (targetPart and targetPart.Parent) then return end
-																	local frameTex = frames[i]
-																	if frameTex then
-																		if type(frameTex) == "string" and tonumber(frameTex) ~= nil and string.len(frameTex) >= 5 then frameTex = "rbxassetid://" .. frameTex end
-																		if typeof(frameTex) == "Instance" and frameTex:IsA("SurfaceAppearance") then
-																			local currentSA = targetPart:FindFirstChildWhichIsA("SurfaceAppearance")
-																			if currentSA then currentSA:Destroy() end
-																			frameTex:Clone().Parent = targetPart
-																		else
-																			if targetPart:IsA("MeshPart") then targetPart.TextureID = frameTex
-																			elseif targetPart:FindFirstChild("Mesh") then targetPart.Mesh.TextureId = frameTex
-																			else pcall(function() targetPart.TextureID = frameTex end) end
-																		end
-																	end
-																	task.wait(type(delays) == "table" and (delays[i] or delays[1] or 0.1) or delays)
-																end
-															end
-														end)
-														return
-													end
-												end
-											end
-											if tex and targetPart.Transparency ~= 1 then
-												if type(tex) == "string" and tonumber(tex) ~= nil and string.len(tex) >= 5 then tex = "rbxassetid://" .. tex end
-												if typeof(tex) == "Instance" and tex:IsA("SurfaceAppearance") then
-													if targetPart:FindFirstChildWhichIsA("SurfaceAppearance") then
-														targetPart:FindFirstChildWhichIsA("SurfaceAppearance"):Destroy()
-													end
-													local clone = tex:Clone(); clone.Parent = targetPart
-												elseif targetPart:IsA("MeshPart") then
-													targetPart.TextureID = tex
-												elseif targetPart:FindFirstChild("Mesh") then
-													targetPart.Mesh.TextureId = tex
-												else
-													pcall(function() targetPart.TextureID = tex end)
-												end
-											end
-										end
+									local animated = SkinData:FindFirstChild("Animated") ~= nil
+									local lastApply = 0
+									local function reapply()
+										if tick() - lastApply < 0.5 then return end
+										lastApply = tick()
+										applyWeaponSkin(obj, gunname, selectedSkin)
 									end
-									for _, targetPart in obj:GetDescendants() do
-										applySkinToPart(targetPart)
+									reapply()
+									if not animated then
+										local skinConn
+										skinConn = obj.DescendantAdded:Connect(function()
+											task.defer(function()
+												if obj.Parent then reapply() end
+											end)
+										end)
+										obj.AncestryChanged:Connect(function(_, newParent)
+											if not newParent and skinConn then
+												skinConn:Disconnect(); skinConn = nil
+											end
+										end)
 									end
-									local skinConn
-									skinConn = obj.DescendantAdded:Connect(applySkinToPart)
-									obj.AncestryChanged:Connect(function(_, newParent)
-										if not newParent and skinConn then
-											skinConn:Disconnect(); skinConn = nil
-										end
-									end)
 								end
 							end
 						end
@@ -5918,9 +6020,7 @@ function UI_Library:RefreshList(dropdown, newValues)
 	end)
 end)()
 val_449 = UI_Library:AddTab("Configs")
-clarityTab = UI_Library:AddTab("Clarity")
-clarityCol1 = clarityTab:AddColumn()
-clarityCol2 = clarityTab:AddColumn()
+clarityTab = UI_Library:AddTab("Clarity", 1)
 do
 val_450 = val_449:AddColumn(); val_452 = val_449:AddColumn(); val_461 = val_450:AddSection"configurations"; val_462 = UI_Library:AddWarning({ type = "confirm" })
 local function refreshConfigList()
@@ -6095,49 +6195,6 @@ do
 	end
 	watchTarget()
 end
-L_joinSec_ = val_452:AddSection"servers"; L_joinSec_:AddBox({ text = "server id", flag = "Join Server Id", value = "", skipflag = true })
-L_joinSec_:AddButton({
-	text = "join server",
-	callback = function()
-		local id = library_flags["Join Server Id"]
-		if not id or id == "" or id == "..." then
-			val_462.text = "Enter a server id first!"; val_462:Show(); return
-		end
-		id = tostring(id):gsub("%s+", "")
-		local ok, err = pcall(function()
-			game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, id, game:GetService("Players").LocalPlayer)
-		end)
-		if not ok then
-			val_462.text = "Failed to join: " .. tostring(err); val_462:Show()
-		end
-	end
-})
-L_joinSec_:AddButton({
-	text = "copy current server id",
-	callback = function()
-		pcall(function() setclipboard(tostring(game.JobId)) end)
-		val_462.text = "Current server id copied to clipboard."; val_462:Show()
-	end
-})
-L_joinSec_:AddButton({
-	text = "server hop (random)",
-	callback = function()
-		local ok, err = pcall(function()
-			local res = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"); local data = game:GetService("HttpService"):JSONDecode(res); local servers = {}
-			for _, s in data.data do
-				if type(s) == "table" and s.playing and s.maxPlayers and s.playing < s.maxPlayers and s.id ~= game.JobId then
-					table.insert(servers, s.id)
-				end
-			end
-			if #servers == 0 then error("no available servers found") end
-			local pick = servers[math.random(1, #servers)]
-			game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, pick, game:GetService("Players").LocalPlayer)
-		end)
-		if not ok then
-			val_462.text = "Server hop failed: " .. tostring(err); val_462:Show()
-		end
-	end
-})
 end
 for var_142, var_53 in val_662.Viewmodels:GetDescendants() do
 	if var_53.Name == "HumanoidRootPart" and var_53:IsA("BasePart") then
@@ -6773,23 +6830,6 @@ task.spawn(function()
 			end
 			if type(obj) == "table" and rawget(obj, "GlobalVelocity") and rawget(obj, "Stamina") and rawget(obj, "HumanoidRootPart") == hrp then
 				env.MovementController = obj; misses = 0
-				if type(rawget(obj, "Jumping")) == "table" and not rawget(obj, "clarityJumpHooked") then
-					local origFire = obj.Jumping.Fire
-					if type(origFire) == "function" then
-						rawset(obj, "clarityJumpHooked", true)
-						obj.Jumping.Fire = function(self, ...)
-							local hum = rawget(obj, "Humanoid")
-							if hum then
-								if library_flags["Jumpbug"] and env.jbBindHeld then
-									hum.UseJumpPower = true; hum.JumpPower = GAME_JUMP_POWER * (library_flags["jbHeight"] or 4)
-								else
-									hum.UseJumpPower = false
-								end
-							end
-							return origFire(self, ...)
-						end
-					end
-				end
 				if env.GunState then break end
 			end
 		end
@@ -7219,7 +7259,7 @@ TabIcons = {
 }
 UI_Library.Init = function(self)
 	if self.hasInit then return end
-	self.hasInit = true; local sg = Instance.new("ScreenGui", game:GetService("CoreGui")); sg.ResetOnSpawn = false; sg.Name = "Clarity_Custom"; sg.IgnoreGuiInset = true; self.base = sg; self.open = true; local openColorPicker = nil; local main = Instance.new("ImageButton", sg); self.mainFrame = main; main.AutoButtonColor = false; main.Size = UDim2.new(0, 720, 0, 530); main.Position = UDim2.new(0.5, -360, 0.5, -265); main.BackgroundColor3 = Color3.fromRGB(16, 17, 16); main.BorderSizePixel = 0
+	self.hasInit = true; local UI_W, UI_H, UI_SIDEBAR, UI_LOGO_H = 720, 530, 135, 70; local sg = Instance.new("ScreenGui", game:GetService("CoreGui")); sg.ResetOnSpawn = false; sg.Name = "Clarity_Custom"; sg.IgnoreGuiInset = true; self.base = sg; self.open = true; local openColorPicker = nil; local main = Instance.new("ImageButton", sg); self.mainFrame = main; main.AutoButtonColor = false; main.Size = UDim2.new(0, UI_W, 0, UI_H); main.Position = UDim2.new(0.5, -UI_W / 2, 0.5, -UI_H / 2); main.BackgroundColor3 = Color3.fromRGB(16, 17, 16); main.BorderSizePixel = 0
 	main.ClipsDescendants = false
 	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 3); local mainStroke = Instance.new("UIStroke", main); mainStroke.Color = Color3.fromRGB(55, 55, 55); mainStroke.Thickness = 1; mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; main.Active = true; self.mainFrame = main
 	main:GetPropertyChangedSignal("Visible"):Connect(function()
@@ -7232,7 +7272,7 @@ UI_Library.Init = function(self)
 	if main.Visible then
 		pcall(function() game:GetService("ContextActionService"):BindActionAtPriority("ClarityMenuSink", function() return Enum.ContextActionResult.Sink end, false, 999999, Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2) end)
 	end
-	local sidebar = Instance.new("Frame", main); sidebar.Size = UDim2.new(0, 135, 1, 0); sidebar.BackgroundColor3 = Color3.fromRGB(12, 13, 12); sidebar.BorderSizePixel = 0; Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 3); local logoHeader = Instance.new("Frame", sidebar); logoHeader.Size = UDim2.new(1, 0, 0, 70); logoHeader.BackgroundTransparency = 1; local logo = Instance.new("ImageLabel", logoHeader); logo.Size = UDim2.new(0, 48, 0, 48); logo.Position = UDim2.new(0.5, -24, 0.5, -24); logo.BackgroundTransparency = 1; logo.Image = "rbxassetid://133384875688188"; logo.ImageColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(255, 255, 255); table.insert(UI_Library.theme, logo); local logoSep = Instance.new("Frame", sidebar); logoSep.Size = UDim2.new(0.8, 0, 0, 1); logoSep.Position = UDim2.new(0.1, 0, 0, 70); logoSep.BackgroundColor3 = Color3.fromRGB(40, 40, 40); logoSep.BorderSizePixel = 0; local sidebarDiv = Instance.new("Frame", main); sidebarDiv.Size = UDim2.new(0, 1, 1, -16); sidebarDiv.Position = UDim2.new(0, 135, 0, 8); sidebarDiv.BackgroundColor3 = Color3.fromRGB(40, 40, 40); sidebarDiv.BorderSizePixel = 0; local tabContainer = Instance.new("ScrollingFrame", sidebar); tabContainer.Size = UDim2.new(1, 0, 1, -70); tabContainer.Position = UDim2.new(0, 0, 0, 70); tabContainer.BackgroundTransparency = 1; tabContainer.BorderSizePixel = 0; tabContainer.ScrollBarThickness = 1; tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0); tabContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y; local list = Instance.new("UIListLayout", tabContainer); list.Padding = UDim.new(0, 3); list.HorizontalAlignment = Enum.HorizontalAlignment.Center; list.SortOrder = Enum.SortOrder.LayoutOrder
+	local sidebar = Instance.new("Frame", main); sidebar.Size = UDim2.new(0, UI_SIDEBAR, 1, 0); sidebar.BackgroundColor3 = Color3.fromRGB(12, 13, 12); sidebar.BorderSizePixel = 0; Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 3); local logoHeader = Instance.new("Frame", sidebar); logoHeader.Size = UDim2.new(1, 0, 0, UI_LOGO_H); logoHeader.BackgroundTransparency = 1; logoHeader.Parent = sidebar; local logo = Instance.new("ImageLabel", logoHeader); logo.Size = UDim2.new(0, 48, 0, 48); logo.Position = UDim2.new(0.5, -24, 0.5, -24); logo.BackgroundTransparency = 1; logo.Image = "rbxassetid://133384875688188"; logo.ImageColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(255, 255, 255); table.insert(UI_Library.theme, logo); local logoSep = Instance.new("Frame", sidebar); logoSep.Size = UDim2.new(0.8, 0, 0, 1); logoSep.Position = UDim2.new(0.1, 0, 0, UI_LOGO_H); logoSep.BackgroundColor3 = Color3.fromRGB(40, 40, 40); logoSep.BorderSizePixel = 0; local sidebarDiv = Instance.new("Frame", main); sidebarDiv.Size = UDim2.new(0, 1, 1, -16); sidebarDiv.Position = UDim2.new(0, UI_SIDEBAR, 0, 8); sidebarDiv.BackgroundColor3 = Color3.fromRGB(40, 40, 40); sidebarDiv.BorderSizePixel = 0; local tabContainer = Instance.new("ScrollingFrame", sidebar); tabContainer.Size = UDim2.new(1, 0, 1, -UI_LOGO_H); tabContainer.Position = UDim2.new(0, 0, 0, UI_LOGO_H); tabContainer.BackgroundTransparency = 1; tabContainer.BorderSizePixel = 0; tabContainer.ScrollBarThickness = 1; tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0); tabContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y; local list = Instance.new("UIListLayout", tabContainer); list.Padding = UDim.new(0, 3); list.HorizontalAlignment = Enum.HorizontalAlignment.Center; list.SortOrder = Enum.SortOrder.LayoutOrder
 	local floatingDropdowns = {}
 	local content = Instance.new("Frame", main); content.Size = UDim2.new(1, -145, 1, -20); content.Position = UDim2.new(0, 140, 0, 10); content.BackgroundTransparency = 1; content.BorderSizePixel = 0; local activePage = nil; local activeBtn = nil; local previewWin = Instance.new("Frame", main); previewWin.Size = UDim2.new(0, 240, 0, 360); previewWin.Position = UDim2.new(1, 35, 0, 0); previewWin.BackgroundColor3 = Color3.fromRGB(15, 15, 15); previewWin.Visible = false; Instance.new("UICorner", previewWin).CornerRadius = UDim.new(0, 3); local previewStroke = Instance.new("UIStroke", previewWin); previewStroke.Color = Color3.fromRGB(25, 25, 25); local previewHeader = Instance.new("TextLabel", previewWin); previewHeader.Size = UDim2.new(1, 0, 0, 25); previewHeader.BackgroundTransparency = 1; previewHeader.Text = "esp preview"; previewHeader.TextColor3 = Color3.fromRGB(140, 140, 140); previewHeader.Font = Enum.Font.Code; previewHeader.TextSize = 13; local viewport = Instance.new("ViewportFrame", previewWin); viewport.Size = UDim2.new(0.9, 0, 0.75, 0); viewport.Position = UDim2.new(0.05, 0, 0.08, 0); viewport.BackgroundTransparency = 1; viewport.Ambient = Color3.fromRGB(200, 200, 200); local cam = Instance.new("Camera"); cam.FieldOfView = 50; viewport.CurrentCamera = cam; cam.Parent = viewport; local light = Instance.new("PointLight", cam); light.Color = Color3.fromRGB(255, 255, 255); light.Brightness = 2; light.Range = 15; local previewModel = Instance.new("Model", viewport); local previewReady = false; local previewDragging = false; local previewLastX = 0; local previewRotY = 0
 	local function rebuildDummy()
@@ -7558,7 +7598,7 @@ UI_Library.Init = function(self)
 		end
 	end)
 	for index, tab in self.tabs do
-		local tabBtn = Instance.new("TextButton", tabContainer); tabBtn.LayoutOrder = index * 10; tabBtn.Size = UDim2.new(0, 130, 0, 32); tabBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); tabBtn.BackgroundTransparency = 1; tabBtn.Text = ""; Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 3); local tabIcon = Instance.new("ImageLabel", tabBtn)
+		local tabBtn = Instance.new("TextButton", tabContainer); tabBtn.LayoutOrder = index * 10; tabBtn.Size = UDim2.new(0, 130, 0, 32); tabBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); tabBtn.BackgroundTransparency = 1; tabBtn.Text = ""; Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 3); local tabAccent = Instance.new("Frame", tabBtn); tabAccent.Name = "TabAccent"; tabAccent.Size = UDim2.new(0, 2, 1, -8); tabAccent.Position = UDim2.new(0, 0, 0, 4); tabAccent.BackgroundColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); tabAccent.BorderSizePixel = 0; tabAccent.Visible = false; table.insert(UI_Library.theme, tabAccent); local tabIcon = Instance.new("ImageLabel", tabBtn)
 		local icTitle = tostring(tab.title or ""):lower():gsub("(%a)(%w*)", function(a, b) return a:upper() .. b end)
 		if icTitle == "Demos" then
 			tabIcon.Size = UDim2.new(0, 48, 0, 48); tabIcon.Position = UDim2.new(0, -4, 0.5, -24)
@@ -7571,11 +7611,51 @@ UI_Library.Init = function(self)
 		if #tab.subtabs > 0 then
 			tab.subContainer.Visible = true
 			for _, sub in tab.subtabs do
-				local sBtn = Instance.new("TextButton", tab.subContainer); sBtn.Size = UDim2.new(1, 0, 0, 22); sBtn.BackgroundTransparency = 1; sBtn.Text = ""; local sLabel = Instance.new("TextLabel", sBtn); sLabel.Size = UDim2.new(1, -46, 1, 0); sLabel.Position = UDim2.new(0, 46, 0, 0); sLabel.BackgroundTransparency = 1; sLabel.Text = sub.title:lower(); sLabel.Font = Enum.Font.Code; sLabel.TextSize = 13; sLabel.TextColor3 = Color3.fromRGB(120, 120, 120); sLabel.TextXAlignment = Enum.TextXAlignment.Left; table.insert(tab.sidebarSubBtns, {btn = sBtn, label = sLabel, sub = sub})
+				local sBtn = Instance.new("TextButton", tab.subContainer); sBtn.Size = UDim2.new(1, 0, 0, 24); sBtn.BackgroundTransparency = 1; sBtn.Text = ""; local sLabel = Instance.new("TextLabel", sBtn); sLabel.Size = UDim2.new(1, -46, 1, 0); sLabel.Position = UDim2.new(0, 46, 0, 0); sLabel.BackgroundTransparency = 1; sLabel.Text = sub.title:lower(); sLabel.Font = Enum.Font.Code; sLabel.TextSize = 13; sLabel.TextColor3 = Color3.fromRGB(120, 120, 120); sLabel.TextXAlignment = Enum.TextXAlignment.Left; table.insert(tab.sidebarSubBtns, {btn = sBtn, label = sLabel, sub = sub})
 			end
 		end
 		local pageFrame = Instance.new("ScrollingFrame", content); pageFrame.Size = UDim2.new(1, 0, 1, 0); pageFrame.BackgroundTransparency = 1; pageFrame.BorderSizePixel = 0; pageFrame.ScrollBarThickness = 1; pageFrame.CanvasSize = UDim2.new(0, 0, 0, 0); pageFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y; pageFrame.Visible = false
-		if tostring(tab.title):lower() == "skins" then
+		if tostring(tab.title):lower() == "clarity" then
+			pageFrame.AutomaticCanvasSize = Enum.AutomaticSize.None; pageFrame.CanvasSize = UDim2.new(0, 0, 1, 0); pageFrame.ScrollingEnabled = false
+			local function makeHomeHeader(parent, title, order)
+				local hdr = Instance.new("TextLabel", parent); hdr.Size = UDim2.new(1, 0, 0, 18); hdr.BackgroundTransparency = 1; hdr.Text = title:lower(); hdr.TextColor3 = Color3.fromRGB(140, 140, 140); hdr.Font = Enum.Font.Code; hdr.TextSize = 13; hdr.TextXAlignment = Enum.TextXAlignment.Left; hdr.LayoutOrder = order; return hdr
+			end
+			local function makeHomeBtn(parent, text, order, callback)
+				local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(1, 0, 0, 30); btn.BackgroundColor3 = Color3.fromRGB(26, 26, 26); btn.BorderSizePixel = 0; btn.Text = text:lower(); btn.Font = Enum.Font.Code; btn.TextSize = 13; btn.TextColor3 = Color3.fromRGB(220, 220, 220); btn.AutoButtonColor = false; btn.LayoutOrder = order
+				Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 3); local st = Instance.new("UIStroke", btn); st.Color = Color3.fromRGB(38, 38, 38); st.Thickness = 1
+				btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(34, 34, 34) end)
+				btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(26, 26, 26) end)
+				btn.MouseButton1Click:Connect(callback); return btn
+			end
+			local function serverHop()
+				pcall(function()
+					local HS = game:GetService("HttpService"); local TS = game:GetService("TeleportService"); local LP = game:GetService("Players").LocalPlayer
+					local res = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"); local data = HS:JSONDecode(res); local servers = {}
+					for _, s in data.data do
+						if type(s) == "table" and s.playing and s.maxPlayers and s.playing < s.maxPlayers and s.id ~= game.JobId then
+							table.insert(servers, s.id)
+						end
+					end
+					if #servers == 0 then error("no servers") end
+					TS:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LP)
+				end)
+			end
+			local homeCols = {}
+			for i = 1, 2 do
+				local col = Instance.new("Frame", pageFrame); col.Size = UDim2.new(0.49, -4, 1, -4); col.Position = UDim2.new((i - 1) * 0.51, 0, 0, 0); col.BackgroundTransparency = 1
+				local colList = Instance.new("UIListLayout", col); colList.Padding = UDim.new(0, 6); colList.SortOrder = Enum.SortOrder.LayoutOrder
+				homeCols[i] = col
+			end
+			makeHomeHeader(homeCols[1], "official clarity servers", 1)
+			makeHomeBtn(homeCols[1], "server hop (random)", 2, serverHop)
+			makeHomeBtn(homeCols[1], "copy current server id", 3, function()
+				pcall(function() setclipboard(tostring(game.JobId)) end)
+			end)
+			makeHomeHeader(homeCols[2], "important links", 1)
+			makeHomeBtn(homeCols[2], "website", 2, function() pcall(function() setclipboard("https://claritytk.vercel.app/") end) end)
+			makeHomeBtn(homeCols[2], "youtube", 3, function() pcall(function() setclipboard("https://www.youtube.com/@soohiopeople") end) end)
+			makeHomeBtn(homeCols[2], "support discord", 4, function() pcall(function() setclipboard("https://discord.gg/fth8upe6hf") end) end)
+		elseif tostring(tab.title):lower() == "skins" then
 			local skinLayout = Instance.new("UIListLayout", pageFrame); skinLayout.Padding = UDim.new(0, 8); skinLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; skinLayout.SortOrder = Enum.SortOrder.LayoutOrder; Instance.new("UIPadding", pageFrame).PaddingTop = UDim.new(0, 5); local RS = game:GetService("ReplicatedStorage"); local Skins = RS:FindFirstChild("Skins"); local Viewmodels = RS:FindFirstChild("Viewmodels"); local AllWeapons = {}; local AllSkins = {}; local AllKnives = { "CT Knife", "T Knife", "Banana", "Bayonet", "Bearded Axe", "Butterfly Knife", "Cleaver", "Crowbar", "Falchion Knife", "Flip Knife", "Gut Knife", "Huntsman Knife", "Karambit", "M9 Bayonet", "Sickle" }
 			if Skins then
 				for _, v in Skins:GetChildren() do
@@ -7879,101 +7959,8 @@ UI_Library.Init = function(self)
 							d.Anchored = true; d.CanCollide = false
 						end
 					end
-					if currentSkin ~= "Inventory" and Skins then
-						local wepForSkin = currentWeapon
-						if (wepForSkin == "CT Knife" or wepForSkin == "T Knife") and not Skins:FindFirstChild(wepForSkin) then
-							wepForSkin = "M9 Bayonet"
-						end
-						local skinData = Skins:FindFirstChild(wepForSkin) and Skins[wepForSkin]:FindFirstChild(currentSkin)
-						if skinData then
-							for _, targetPart in clone:GetDescendants() do
-								if targetPart:IsA("BasePart") or targetPart:IsA("MeshPart") then
-									local tex = nil; local wm = skinData:FindFirstChild("WorldModel")
-									for _, Data in skinData:GetDescendants() do
-										if wm and Data:IsDescendantOf(wm) then continue end
-										local cleanDataName = Data.Name:gsub("^#%s*", "")
-										if cleanDataName == targetPart.Name or string.match(cleanDataName, "^" .. targetPart.Name .. "%d*$") or (targetPart.Name == "Main" and (cleanDataName == "Part1" or cleanDataName == "Part")) then
-											if Data:IsA("StringValue") then tex = Data.Value
-											elseif Data:IsA("MeshPart") then tex = Data.TextureID
-											elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-											elseif Data:IsA("SurfaceAppearance") then tex = Data end
-											if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-										end
-									end
-									if not tex or tex == "" then
-										for _, Data in skinData:GetDescendants() do
-											if wm and Data:IsDescendantOf(wm) then continue end
-											local cleanDataName = Data.Name:gsub("^#%s*", "")
-											if cleanDataName == "Handle" and (targetPart.Name == "Blade" or targetPart.Name == "Main") then
-												if Data:IsA("StringValue") then tex = Data.Value
-												elseif Data:IsA("MeshPart") then tex = Data.TextureID
-												elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-												elseif Data:IsA("SurfaceAppearance") then tex = Data end
-												if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-											end
-										end
-									end
-									if not tex or tex == "" then
-										if wm then
-											for _, Data in wm:GetDescendants() do
-												local cleanDataName = Data.Name:gsub("^#%s*", "")
-												if cleanDataName == targetPart.Name or string.match(cleanDataName, "^" .. targetPart.Name .. "%d*$") or (targetPart.Name == "Main" and (cleanDataName == "Part1" or cleanDataName == "Part")) then
-													if Data:IsA("StringValue") then tex = Data.Value
-													elseif Data:IsA("MeshPart") then tex = Data.TextureID
-													elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-													elseif Data:IsA("SurfaceAppearance") then tex = Data end
-													if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-												end
-											end
-										end
-									end
-									if not tex or tex == "" then
-										if wm then
-											for _, Data in wm:GetDescendants() do
-												local cleanDataName = Data.Name:gsub("^#%s*", "")
-												if cleanDataName == "Handle" and (targetPart.Name == "Blade" or targetPart.Name == "Main") then
-													if Data:IsA("StringValue") then tex = Data.Value
-													elseif Data:IsA("MeshPart") then tex = Data.TextureID
-													elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-													elseif Data:IsA("SurfaceAppearance") then tex = Data end
-													if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-												end
-											end
-										end
-									end
-									local isAnimated = skinData:FindFirstChild("Animated", true)
-									if (not tex or tex == "") and not isAnimated then
-										for _, Data in wm and wm:GetDescendants() or skinData:GetDescendants() do
-											local lowerName = Data.Name:lower()
-											if not lowerName:match("normal") and not lowerName:match("pbr") and not lowerName:match("roughness") and not lowerName:match("specular") and not lowerName:match("metallic") then
-											local isAssetId = Data:IsA("StringValue") and (Data.Value:match("rbxassetid://") or (tonumber(Data.Value) ~= nil and string.len(Data.Value) >= 5))
-												if Data:IsA("StringValue") and isAssetId and Data.Value ~= "rbxassetid://0" then tex = Data.Value
-												elseif Data:IsA("MeshPart") and Data.TextureID ~= "" and Data.TextureID ~= "rbxassetid://0" then tex = Data.TextureID
-												elseif (Data:IsA("Decal") or Data:IsA("Texture")) and Data.Texture ~= "" and Data.Texture ~= "rbxassetid://0" then tex = Data.Texture
-												elseif Data:IsA("SurfaceAppearance") then tex = Data end
-												if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-											end
-										end
-									end
-									if tex and targetPart.Transparency ~= 1 then
-										if type(tex) == "string" and tonumber(tex) ~= nil and string.len(tex) >= 5 then tex = "rbxassetid://" .. tex end
-										if typeof(tex) == "Instance" and tex:IsA("SurfaceAppearance") then
-											if targetPart:FindFirstChildWhichIsA("SurfaceAppearance") then
-												targetPart:FindFirstChildWhichIsA("SurfaceAppearance"):Destroy()
-											end
-											local saClone = tex:Clone(); saClone.Parent = targetPart
-										elseif targetPart:IsA("MeshPart") then
-											targetPart.TextureID = tex
-										elseif targetPart:FindFirstChild("Mesh") then
-											targetPart.Mesh.TextureId = tex
-										else
-											pcall(function() targetPart.TextureID = tex end)
-										end
-									end
-								end
-							end
-						end
-					end
+					clone.Name = currentWeapon
+					applyWeaponSkin(clone, currentWeapon, currentSkin)
 					local minV = Vector3.new(math.huge, math.huge, math.huge); local maxV = Vector3.new(-math.huge, -math.huge, -math.huge); local hasVisible = false
 					for _, d in clone:GetDescendants() do
 						if d:IsA("BasePart") and d.Transparency < 1 then
@@ -8058,101 +8045,8 @@ UI_Library.Init = function(self)
 							d.Anchored = true; d.CanCollide = false
 						end
 					end
-					if currentKnifeSkin ~= "Inventory" and Skins then
-						local wepForSkin = currentKnife
-						if (wepForSkin == "CT Knife" or wepForSkin == "T Knife") and not Skins:FindFirstChild(wepForSkin) then
-							wepForSkin = "M9 Bayonet"
-						end
-						local skinData = Skins:FindFirstChild(wepForSkin) and Skins[wepForSkin]:FindFirstChild(currentKnifeSkin)
-						if skinData then
-							for _, targetPart in clone:GetDescendants() do
-								if targetPart:IsA("BasePart") or targetPart:IsA("MeshPart") then
-									local tex = nil; local wm = skinData:FindFirstChild("WorldModel")
-									for _, Data in skinData:GetDescendants() do
-										if wm and Data:IsDescendantOf(wm) then continue end
-										local cleanDataName = Data.Name:gsub("^#%s*", "")
-										if cleanDataName == targetPart.Name or string.match(cleanDataName, "^" .. targetPart.Name .. "%d*$") or (targetPart.Name == "Main" and (cleanDataName == "Part1" or cleanDataName == "Part")) then
-											if Data:IsA("StringValue") then tex = Data.Value
-											elseif Data:IsA("MeshPart") then tex = Data.TextureID
-											elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-											elseif Data:IsA("SurfaceAppearance") then tex = Data end
-											if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-										end
-									end
-									if not tex or tex == "" then
-										for _, Data in skinData:GetDescendants() do
-											if wm and Data:IsDescendantOf(wm) then continue end
-											local cleanDataName = Data.Name:gsub("^#%s*", "")
-											if cleanDataName == "Handle" and (targetPart.Name == "Blade" or targetPart.Name == "Main") then
-												if Data:IsA("StringValue") then tex = Data.Value
-												elseif Data:IsA("MeshPart") then tex = Data.TextureID
-												elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-												elseif Data:IsA("SurfaceAppearance") then tex = Data end
-												if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-											end
-										end
-									end
-									if not tex or tex == "" then
-										if wm then
-											for _, Data in wm:GetDescendants() do
-												local cleanDataName = Data.Name:gsub("^#%s*", "")
-												if cleanDataName == targetPart.Name or string.match(cleanDataName, "^" .. targetPart.Name .. "%d*$") or (targetPart.Name == "Main" and (cleanDataName == "Part1" or cleanDataName == "Part")) then
-													if Data:IsA("StringValue") then tex = Data.Value
-													elseif Data:IsA("MeshPart") then tex = Data.TextureID
-													elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-													elseif Data:IsA("SurfaceAppearance") then tex = Data end
-													if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-												end
-											end
-										end
-									end
-									if not tex or tex == "" then
-										if wm then
-											for _, Data in wm:GetDescendants() do
-												local cleanDataName = Data.Name:gsub("^#%s*", "")
-												if cleanDataName == "Handle" and (targetPart.Name == "Blade" or targetPart.Name == "Main") then
-													if Data:IsA("StringValue") then tex = Data.Value
-													elseif Data:IsA("MeshPart") then tex = Data.TextureID
-													elseif Data:IsA("Decal") or Data:IsA("Texture") then tex = Data.Texture
-													elseif Data:IsA("SurfaceAppearance") then tex = Data end
-													if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-												end
-											end
-										end
-									end
-									local isAnimated = skinData:FindFirstChild("Animated", true)
-									if (not tex or tex == "") and not isAnimated then
-										for _, Data in wm and wm:GetDescendants() or skinData:GetDescendants() do
-											local lowerName = Data.Name:lower()
-											if not lowerName:match("normal") and not lowerName:match("pbr") and not lowerName:match("roughness") and not lowerName:match("specular") and not lowerName:match("metallic") then
-											local isAssetId = Data:IsA("StringValue") and (Data.Value:match("rbxassetid://") or (tonumber(Data.Value) ~= nil and string.len(Data.Value) >= 5))
-												if Data:IsA("StringValue") and isAssetId and Data.Value ~= "rbxassetid://0" then tex = Data.Value
-												elseif Data:IsA("MeshPart") and Data.TextureID ~= "" and Data.TextureID ~= "rbxassetid://0" then tex = Data.TextureID
-												elseif (Data:IsA("Decal") or Data:IsA("Texture")) and Data.Texture ~= "" and Data.Texture ~= "rbxassetid://0" then tex = Data.Texture
-												elseif Data:IsA("SurfaceAppearance") then tex = Data end
-												if tex and tex ~= "" and tex ~= "rbxassetid://0" then break end
-											end
-										end
-									end
-									if tex and targetPart.Transparency ~= 1 then
-										if type(tex) == "string" and tonumber(tex) ~= nil and string.len(tex) >= 5 then tex = "rbxassetid://" .. tex end
-										if typeof(tex) == "Instance" and tex:IsA("SurfaceAppearance") then
-											if targetPart:FindFirstChildWhichIsA("SurfaceAppearance") then
-												targetPart:FindFirstChildWhichIsA("SurfaceAppearance"):Destroy()
-											end
-											local saClone = tex:Clone(); saClone.Parent = targetPart
-										elseif targetPart:IsA("MeshPart") then
-											targetPart.TextureID = tex
-										elseif targetPart:FindFirstChild("Mesh") then
-											targetPart.Mesh.TextureId = tex
-										else
-											pcall(function() targetPart.TextureID = tex end)
-										end
-									end
-								end
-							end
-						end
-					end
+					clone.Name = currentKnife
+					applyWeaponSkin(clone, currentKnife, currentKnifeSkin)
 					local minV = Vector3.new(math.huge, math.huge, math.huge); local maxV = Vector3.new(-math.huge, -math.huge, -math.huge); local hasVisible = false
 					for _, d in clone:GetDescendants() do
 						if d:IsA("BasePart") and d.Transparency < 1 then
@@ -8849,11 +8743,14 @@ UI_Library.Init = function(self)
 		local function updateSidebarVisuals(selTab, selSub)
 			if UI_Library.lastTabBtn then
 				UI_Library.lastTabBtn:FindFirstChild("TextLabel").TextColor3 = Color3.fromRGB(160, 160, 160); UI_Library.lastTabBtn.BackgroundTransparency = 1
+				local oldAccent = UI_Library.lastTabBtn:FindFirstChild("TabAccent"); if oldAccent then oldAccent.Visible = false end
 			end
 			if UI_Library.lastSubBtn then
 				UI_Library.lastSubBtn.TextColor3 = Color3.fromRGB(120, 120, 120)
 			end
-			tabLabel.TextColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); tabBtn.BackgroundTransparency = 0.8; UI_Library.lastTabBtn = tabBtn
+			tabLabel.TextColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); tabBtn.BackgroundTransparency = 0.85; tabBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+			local newAccent = tabBtn:FindFirstChild("TabAccent"); if newAccent then newAccent.Visible = true end
+			UI_Library.lastTabBtn = tabBtn
 			if selSub then
 				for _, item in tab.sidebarSubBtns do
 					if item.sub == selSub then
@@ -8868,7 +8765,7 @@ UI_Library.Init = function(self)
 			activePage = pageFrame; activeBtn = tabBtn; pageFrame.Visible = true; previewWin.Visible = (tab.title == "Visuals"); local TS = game:GetService("TweenService"); local ti = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 			for _, t in self.tabs do
 				if t.subContainer then
-					local targetHeight = (t == tab and #t.subtabs > 0) and (#t.subtabs * 22) or 0; TS:Create(t.subContainer, ti, {Size = UDim2.new(1, 0, 0, targetHeight)}):Play()
+					local targetHeight = (t == tab and #t.subtabs > 0) and (#t.subtabs * 24) or 0; TS:Create(t.subContainer, ti, {Size = UDim2.new(1, 0, 0, targetHeight)}):Play()
 				end
 			end
 			if #tab.subtabs > 0 then
@@ -9039,6 +8936,9 @@ UI_Library.Init = function(self)
 	end
 end
 UI_Library:Init(); setAimbotPage(library_flags["aimbotWeaponPage"] or "All (Shared)")
+task.defer(function()
+	if env.refreshKeybindList then pcall(env.refreshKeybindList) end
+end)
 hitlogGui = Instance.new("ScreenGui", game:service("CoreGui")); logholder = game:GetObjects("rbxassetid://6502006065")[1]; logholder.log.main.BackgroundColor3 = Color3.fromRGB(25, 25, 25); logholder.log.main.text.TextColor3 = Color3.new(0.8, 0.8, 0.8); logholder.Parent = hitlogGui; logcount = 0; logDebounce = false 
 function hitlog(var_45, var_156, var_25)
 	var_156 = string.find(var_156, "Head") and "Head" or var_156 
@@ -9187,7 +9087,7 @@ val_733.Status.Kills.Changed:Connect(function(var_189)
 		onKill:Fire()
 	end
 end)
-env.MenuFrame = val_824.mainFrame; draggable(val_948); draggable(val_969); draggable(val_824.mainFrame)
+env.MenuFrame = UI_Library.mainFrame or (val_824 and val_824.mainFrame); draggable(val_948); draggable(val_969); draggable(val_824.mainFrame)
 spawn(function()
 	while wait(3.5) do
 		updateSkybox()
