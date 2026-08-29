@@ -3383,17 +3383,6 @@ function val_440:GetTabs()
 				end
 				if library_flags["KillAllAuto"] then
 					args[2] = {X = 0/0, Y = 0/0, Z = 0/0}
-				elseif hitPart then
-					local loopKills = library_flags["PlayerLoopKills"]
-					if loopKills then
-						local model = hitPart:FindFirstAncestorWhichIsA("Model")
-						if model then
-							local hitPlr = val_413:GetPlayerFromCharacter(model)
-							if hitPlr and loopKills[hitPlr.Name] then
-								args[2] = {X = 0/0, Y = 0/0, Z = 0/0}
-							end
-						end
-					end
 				end
 				if not hitPart or not hitPart.Parent then
 					return oldNamecall(var_270, unpack(args, 1, args.n))
@@ -4224,7 +4213,7 @@ end
 env.applyVisualPreset = function(name)
 	local preset = env.VISUAL_PRESETS and env.VISUAL_PRESETS[name]
 	if not preset then return end
-	for flag, value in preset do
+	for flag, value in pairs(preset) do
 		library_flags[flag] = value
 		local opt = UI_Library.options[flag]
 		if opt then
@@ -11356,30 +11345,10 @@ end)
 end)() 
 ;(function()
 	local RS = game:GetService("RunService"); local hitRemote = val_776; local localPlr = val_733; local players = val_711; local cam = val_749
-	local rsWeapons = game:GetService("ReplicatedStorage"):FindFirstChild("Weapons")
-	local nanPos = {X = 0/0, Y = 0/0, Z = 0/0}
-	local killParts = {"HeadHB", "Head", "UpperTorso", "Torso", "HumanoidRootPart", "LowerTorso"}
-	local burstCount = 30
-	local function getKillTargets(char)
-		local hitboxes = char:FindFirstChild("Hitboxes")
-		local out, seen = {}, {}
-		for _, name in killParts do
-			local part = (hitboxes and hitboxes:FindFirstChild(name)) or char:FindFirstChild(name)
-			if part and part:IsA("BasePart") and not seen[part] then
-				seen[part] = true; out[#out + 1] = part
-			end
-		end
-		return out
-	end
-	local function fireKillHit(hitPart, gunName, gunRef, camPos, srvTime)
-		hitRemote:FireServer(
-			hitPart, nanPos, gunName, 4096, gunRef, nil, 1, false, true, camPos, srvTime, Vector3.new(0, 1, 0), true, true, true, true, true, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
-		)
-	end
-	local function runAutoKill()
+	RS.Heartbeat:Connect(function()
 		local loopKills = library_flags["PlayerLoopKills"]; local hasLoopKill = false
 		if loopKills then
-			for _, v in loopKills do
+			for k, v in loopKills do
 				if v then hasLoopKill = true; break end
 			end
 		end
@@ -11389,15 +11358,11 @@ end)()
 		if not char then return end
 		local hum = char:FindFirstChild("Humanoid")
 		if not hum or hum.Health <= 0 then return end
-		local gun = char:FindFirstChild("Gun")
-		local gunRef = gun
-		if not gunRef and rsWeapons then
-			gunRef = rsWeapons:FindFirstChild("AWP") or rsWeapons:FindFirstChild("AK47") or rsWeapons:FindFirstChild("M4A4")
-		end
-		if not gunRef then return end
-		local eqTool = char:FindFirstChild("EquippedTool")
-		local gunName = (eqTool and eqTool.Value ~= "" and eqTool.Value) or "AWP"
-		local camPos = cam.CFrame.p; local srvTime = workspace:GetServerTimeNow()
+		local gun = char:FindFirstChild("Gun"); local eqTool = char:FindFirstChild("EquippedTool")
+		if not gun or not eqTool then return end
+		local gunName = "AWP"; local gunRef = gun; local rsWeapons = game:GetService("ReplicatedStorage"):FindFirstChild("Weapons"); local awpFolder = rsWeapons and rsWeapons:FindFirstChild("AWP")
+		if awpFolder then gunRef = awpFolder end
+		local camPos = cam.CFrame.p; local srvTime = workspace:GetServerTimeNow(); local burstCount = 3; local nanBypass = true
 		for _, plr in players:GetPlayers() do
 			if plr == localPlr then continue end
 			local isLk = loopKills and loopKills[plr.Name]
@@ -11407,21 +11372,17 @@ end)()
 			end
 			local pChar = plr.Character
 			if not pChar then continue end
-			local pHum = pChar:FindFirstChild("Humanoid")
-			if not pHum or pHum.Health <= 0 then continue end
-			local ff = pChar:FindFirstChildOfClass("ForceField")
-			if ff then pcall(function() ff:Destroy() end) end
-			local targets = getKillTargets(pChar)
-			if #targets == 0 then continue end
-			for _ = 1, burstCount do
-				for _, hitPart in targets do
-					pcall(fireKillHit, hitPart, gunName, gunRef, camPos, srvTime)
-				end
+			local hitboxes = pChar:FindFirstChild("Hitboxes"); local head = (hitboxes and hitboxes:FindFirstChild("HeadHB")) or pChar:FindFirstChild("HeadHB") or pChar:FindFirstChild("Head"); local pHum = pChar:FindFirstChild("Humanoid")
+			if not head or not pHum or pHum.Health <= 0 then continue end
+			for burst = 1, burstCount do
+				pcall(function()
+					local posArg = nanBypass and {X = 0/0, Y = 0/0, Z = 0/0} or encodePos(head.Position); hitRemote:FireServer(
+						head, posArg, gunName, 4096, gunRef, nil, 1, false, true, camPos, srvTime, Vector3.new(0, 1, 0), true, true, true, true, true, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+					)
+				end)
 			end
 		end
-	end
-	RS.Heartbeat:Connect(runAutoKill)
-	RS.RenderStepped:Connect(runAutoKill)
+	end)
 end)() 
 ;(function()
 WatermarkGui = Instance.new("ScreenGui"); WatermarkGui.Name = "NativeWatermark"; WatermarkGui.ResetOnSpawn = false; WatermarkGui.IgnoreGuiInset = true; WatermarkGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
