@@ -23,6 +23,7 @@ end
 local env = getgenv(); val_635 = true
 
 
+pcall(function()
 	local __bypass_old
 	__bypass_old = hookmetamethod(game, "__namecall", function(b, ...)
 		local c = getnamecallmethod()
@@ -34,6 +35,7 @@ local env = getgenv(); val_635 = true
 		end
 		return __bypass_old(b, ...)
 	end)
+end)
 
 
 if game.PlaceId == 101013872711019 and val_635 then
@@ -1849,17 +1851,18 @@ function updateViewModelVisuals()
                         end
 						if var_255.Name == "Sleeve" then
 							local motor = var_255:FindFirstChild("SleeveMotor")
-							if motor then
+							if motor and env.applySleevePositionOffset then
+								env.applySleevePositionOffset(motor)
+							elseif motor then
 								local sx = (library_flags["skinSleeveX"] or 0) / 25; local sy = (library_flags["skinSleeveY"] or 0) / 25; local sz = (library_flags["skinSleeveZ"] or 0) / 25
 								if not library_flags["skinSleeveChangerToggle"] then
 									sx, sy, sz = 0, 0, 0
 								end
 								local origC0 = motor:GetAttribute("OrigC0")
-								if origC0 then motor.C0 = origC0 end
+								if not origC0 then origC0 = motor.C0; motor:SetAttribute("OrigC0", origC0) end
 								local origC1 = motor:GetAttribute("OrigC1")
-								if not origC1 then
-									origC1 = motor.C1; motor:SetAttribute("OrigC1", origC1)
-								end
+								if not origC1 then origC1 = motor.C1; motor:SetAttribute("OrigC1", origC1) end
+								motor.C0 = origC0
 								motor.C1 = origC1 * CFrame.new(sx, sy, -sz):Inverse()
 							end
 						end
@@ -2467,7 +2470,7 @@ function updateSkybox()
 	
 	local val_406 = library_flags["skyboxValue"]
 	if library_flags["Skybox Changer"] and Skyboxes[val_406] then
-		local val_407 = Instance.new("Sky", val_699); val_407.Name = "customsky"; val_407.SunTextureId = "rbxassetid://"; val_407.CelestialBodiesShown = "rbxassetid://"; val_931 = true 
+		local val_407 = Instance.new("Sky", val_699); val_407.Name = "customsky"; val_407.SunTextureId = ""; val_407.MoonTextureId = ""; val_931 = true 
 		for var_147, var_143 in Skyboxes[val_406] do
 			val_407[var_147] = var_143
 		end
@@ -2477,8 +2480,334 @@ function updateSkybox()
 			val_931 = false; val_408.Parent = workspace; wait(); val_408.Parent = val_699
 		end
 	end
-end 
-val_933 = { "HumanoidRootPart", "FakeHead", "C4", "Gun" }; val_940 = false 
+end
+env.applyPostProcessing = function()
+	if not val_796 or not val_796.Parent then
+		val_796 = Instance.new("ColorCorrectionEffect", val_699)
+	end
+	val_796.TintColor = library_flags["ccTintEnabled"] and (library_flags["ccTintColor"] or Color3.fromRGB(255, 255, 255)) or Color3.fromRGB(255, 255, 255)
+	val_796.Contrast = library_flags["ccContrast"] or 0
+	val_796.Brightness = library_flags["ccExposure"] or 0
+	if library_flags["ccSaturationEnabled"] then
+		val_796.Saturation = library_flags["ccSaturation"] or 0
+	end
+end
+env.setAurora = function()
+	if env._auroraFolder then
+		for _, child in env._auroraFolder:GetChildren() do
+			child:Destroy()
+		end
+	end
+	env._auroraParts = nil
+end
+env.updateAurora = function() end
+env.VISUAL_PRESETS = {
+	Stardust = {
+		["Skybox Changer"] = true, skyboxValue = "Purple Nebula",
+		["Time Changer"] = true, time = 0.35, celestialBodies = true, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 3.4, bloomSize = 30,
+		sunraysEnabled = true, sunraysIntensity = 0.42,
+		atmoEnabled = true, atmoDensity = 0.52, atmoHaze = 2.8, atmoGlare = 1.1,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(175, 95, 255),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(65, 18, 120),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(200, 160, 255),
+		ccContrast = 0.15, ccExposure = 0.12, ccSaturationEnabled = true, ccSaturation = 0.38,
+		["Enabled Ambient"] = true, ambientColor = Color3.fromRGB(100, 50, 145), Brightness = 2.1,
+		weatherEnabled = true, weatherType = "Stardust", weatherIntensity = 165,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Skeleton ESP"] = true, ["Name ESP"] = true, ["Bullet Tracers"] = true,
+		boxESPcolor = Color3.fromRGB(210, 130, 255), skeletonColor = Color3.fromRGB(230, 160, 255),
+		chamsVisibleColor = Color3.fromRGB(190, 110, 255), chamsWallColor = Color3.fromRGB(255, 90, 210),
+		nameESPcolor = Color3.fromRGB(190, 230, 255), tracerColor = Color3.fromRGB(170, 100, 255),
+	},
+	["Neon Night"] = {
+		["Skybox Changer"] = true, skyboxValue = "Dark City",
+		["Time Changer"] = true, time = 1.2, celestialBodies = true, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 4.2, bloomSize = 38,
+		atmoEnabled = true, atmoDensity = 0.42, atmoHaze = 2.2, atmoGlare = 0.9,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(0, 200, 255),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(0, 60, 90),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(140, 250, 255),
+		ccSaturationEnabled = true, ccSaturation = 0.55, ccContrast = 0.18, ccExposure = 0.08,
+		["Enabled Ambient"] = true, ambientColor = Color3.fromRGB(0, 80, 110), Brightness = 1.6,
+		["Fog Changer"] = true, fogStart = 0, fogEnd = 280, fogColor = Color3.fromRGB(10, 40, 70),
+		weatherEnabled = true, weatherType = "Neon Dust", weatherIntensity = 140,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Bullet Tracers"] = true,
+		boxESPcolor = Color3.fromRGB(0, 255, 255), chamsVisibleColor = Color3.fromRGB(0, 240, 255),
+		chamsWallColor = Color3.fromRGB(255, 0, 180), tracerColor = Color3.fromRGB(0, 220, 255),
+	},
+	["Blood Moon"] = {
+		["Skybox Changer"] = true, skyboxValue = "Final Bloodmoon",
+		["Time Changer"] = true, time = 22.5, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 3, bloomSize = 26,
+		sunraysEnabled = true, sunraysIntensity = 0.55,
+		atmoEnabled = true, atmoDensity = 0.62, atmoHaze = 3.5, atmoGlare = 1.2,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(220, 45, 45),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(80, 5, 5),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 130, 130),
+		ccSaturationEnabled = true, ccSaturation = 0.35, ccContrast = 0.2,
+		["Enabled Ambient"] = true, ambientColor = Color3.fromRGB(90, 15, 15), Brightness = 1.4,
+		["Fog Changer"] = true, fogStart = 0, fogEnd = 220, fogColor = Color3.fromRGB(60, 10, 10),
+		weatherEnabled = true, weatherType = "Ash", weatherIntensity = 120,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Skeleton ESP"] = true,
+		boxESPcolor = Color3.fromRGB(255, 50, 50), chamsVisibleColor = Color3.fromRGB(255, 40, 40),
+		chamsWallColor = Color3.fromRGB(180, 0, 0), tracerColor = Color3.fromRGB(255, 80, 60),
+	},
+	Vaporwave = {
+		["Skybox Changer"] = true, skyboxValue = "Pink Vision",
+		["Time Changer"] = true, time = 17.5, auroraEnabled = true, celestialBodies = true,
+		bloomEnabled = true, bloomIntensity = 3.6, bloomSize = 32,
+		atmoEnabled = true, atmoDensity = 0.4, atmoHaze = 2, atmoGlare = 1,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(255, 120, 220),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(90, 40, 130),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 170, 245),
+		ccSaturationEnabled = true, ccSaturation = 0.6, ccExposure = 0.1,
+		weatherEnabled = true, weatherType = "Stardust", weatherIntensity = 130,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Name ESP"] = true,
+		boxESPcolor = Color3.fromRGB(255, 140, 230), chamsVisibleColor = Color3.fromRGB(255, 100, 210),
+		chamsWallColor = Color3.fromRGB(120, 200, 255), nameESPcolor = Color3.fromRGB(200, 255, 255),
+	},
+	["Cyber Dream"] = {
+		["Skybox Changer"] = true, skyboxValue = "Anime Sky",
+		["Time Changer"] = true, time = 2.5, celestialBodies = true, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 4.5, bloomSize = 40,
+		sunraysEnabled = true, sunraysIntensity = 0.35,
+		atmoEnabled = true, atmoDensity = 0.38, atmoHaze = 1.8, atmoGlare = 1.3,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(0, 255, 255),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(255, 0, 200),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(180, 255, 255),
+		ccSaturationEnabled = true, ccSaturation = 0.7, ccContrast = 0.22,
+		weatherEnabled = true, weatherType = "Neon Dust", weatherIntensity = 155,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Skeleton ESP"] = true, ["Bullet Tracers"] = true,
+		boxESPcolor = Color3.fromRGB(0, 255, 255), skeletonColor = Color3.fromRGB(255, 0, 255),
+		chamsVisibleColor = Color3.fromRGB(0, 230, 255), chamsWallColor = Color3.fromRGB(255, 50, 220),
+		tracerColor = Color3.fromRGB(255, 0, 255),
+	},
+	["Galaxy Rush"] = {
+		["Skybox Changer"] = true, skyboxValue = "Space",
+		["Time Changer"] = true, time = 0, celestialBodies = true, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 3.8, bloomSize = 34,
+		atmoEnabled = true, atmoDensity = 0.48, atmoHaze = 2.5, atmoGlare = 1.4,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(90, 40, 200),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(20, 5, 60),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(150, 120, 255),
+		ccSaturationEnabled = true, ccSaturation = 0.45, ccExposure = 0.15,
+		["Enabled Ambient"] = true, ambientColor = Color3.fromRGB(40, 20, 90), Brightness = 1.9,
+		weatherEnabled = true, weatherType = "Stardust", weatherIntensity = 180,
+		espEnabled = true, Chams = true, ["Box ESP"] = true,
+		boxESPcolor = Color3.fromRGB(180, 120, 255), chamsVisibleColor = Color3.fromRGB(140, 80, 255),
+		chamsWallColor = Color3.fromRGB(255, 180, 80),
+	},
+	["Sunset Blaze"] = {
+		["Skybox Changer"] = true, skyboxValue = "Setting Sun",
+		["Time Changer"] = true, time = 18.5, celestialBodies = true, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 3.2, bloomSize = 28,
+		sunraysEnabled = true, sunraysIntensity = 0.65,
+		atmoEnabled = true, atmoDensity = 0.55, atmoHaze = 3.2, atmoGlare = 1.5,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(255, 140, 60),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(180, 50, 20),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 180, 120),
+		ccSaturationEnabled = true, ccSaturation = 0.5, ccContrast = 0.12,
+		["Enabled Ambient"] = true, ambientColor = Color3.fromRGB(120, 50, 20), Brightness = 2.3,
+		weatherEnabled = true, weatherType = "Ash", weatherIntensity = 75,
+		espEnabled = true, Chams = true, ["Box ESP"] = true,
+		boxESPcolor = Color3.fromRGB(255, 160, 80), chamsVisibleColor = Color3.fromRGB(255, 130, 50),
+		chamsWallColor = Color3.fromRGB(255, 60, 30),
+	},
+	["Toxic Glow"] = {
+		["Skybox Changer"] = true, skyboxValue = "Green Space",
+		["Time Changer"] = true, time = 3, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 4, bloomSize = 36,
+		atmoEnabled = true, atmoDensity = 0.45, atmoHaze = 2.4, atmoGlare = 0.8,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(80, 255, 80),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(10, 80, 20),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(160, 255, 160),
+		ccSaturationEnabled = true, ccSaturation = 0.65, ccContrast = 0.2,
+		["Fog Changer"] = true, fogStart = 0, fogEnd = 350, fogColor = Color3.fromRGB(20, 60, 25),
+		weatherEnabled = true, weatherType = "Neon Dust", weatherIntensity = 100,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Skeleton ESP"] = true,
+		boxESPcolor = Color3.fromRGB(80, 255, 80), skeletonColor = Color3.fromRGB(180, 255, 100),
+		chamsVisibleColor = Color3.fromRGB(50, 255, 120), chamsWallColor = Color3.fromRGB(200, 255, 50),
+	},
+	["Anime Heaven"] = {
+		["Skybox Changer"] = true, skyboxValue = "Anime Sky",
+		["Time Changer"] = true, time = 14.5, celestialBodies = false, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 3.5, bloomSize = 30,
+		sunraysEnabled = true, sunraysIntensity = 0.5,
+		atmoEnabled = true, atmoDensity = 0.35, atmoHaze = 1.5, atmoGlare = 1.1,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(255, 180, 220),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(120, 180, 255),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 210, 240),
+		ccSaturationEnabled = true, ccSaturation = 0.55,
+		weatherEnabled = true, weatherType = "Stardust", weatherIntensity = 110,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Name ESP"] = true,
+		boxESPcolor = Color3.fromRGB(255, 180, 220), nameESPcolor = Color3.fromRGB(180, 220, 255),
+		chamsVisibleColor = Color3.fromRGB(255, 150, 200), chamsWallColor = Color3.fromRGB(150, 200, 255),
+	},
+	Inferno = {
+		["Skybox Changer"] = true, skyboxValue = "Alien Red",
+		["Time Changer"] = true, time = 23, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 3.8, bloomSize = 32,
+		atmoEnabled = true, atmoDensity = 0.7, atmoHaze = 4, atmoGlare = 1.6,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(255, 80, 0),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(120, 0, 0),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 140, 80),
+		ccSaturationEnabled = true, ccSaturation = 0.45, ccContrast = 0.25,
+		["Fog Changer"] = true, fogStart = 0, fogEnd = 180, fogColor = Color3.fromRGB(80, 15, 0),
+		weatherEnabled = true, weatherType = "Ash", weatherIntensity = 150,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Bullet Tracers"] = true,
+		boxESPcolor = Color3.fromRGB(255, 100, 0), chamsVisibleColor = Color3.fromRGB(255, 120, 0),
+		chamsWallColor = Color3.fromRGB(255, 30, 0), tracerColor = Color3.fromRGB(255, 160, 40),
+	},
+	["Crystal Ice"] = {
+		["Skybox Changer"] = true, skyboxValue = "The Winter",
+		["Time Changer"] = true, time = 10, celestialBodies = true, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 2.8, bloomSize = 24,
+		sunraysEnabled = true, sunraysIntensity = 0.45,
+		atmoEnabled = true, atmoDensity = 0.5, atmoHaze = 3, atmoGlare = 1.8,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(200, 240, 255),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(140, 190, 255),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(220, 245, 255),
+		ccSaturationEnabled = true, ccSaturation = 0.25, ccExposure = 0.1,
+		["Fog Changer"] = true, fogStart = 0, fogEnd = 400, fogColor = Color3.fromRGB(200, 230, 255),
+		weatherEnabled = true, weatherType = "Snow", weatherIntensity = 160,
+		espEnabled = true, Chams = true, ["Box ESP"] = true,
+		boxESPcolor = Color3.fromRGB(200, 240, 255), chamsVisibleColor = Color3.fromRGB(180, 230, 255),
+		chamsWallColor = Color3.fromRGB(100, 180, 255),
+	},
+	["Oblivion Void"] = {
+		["Skybox Changer"] = true, skyboxValue = "Oblivion",
+		["Time Changer"] = true, time = 0.5, celestialBodies = true, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 3.6, bloomSize = 30,
+		atmoEnabled = true, atmoDensity = 0.58, atmoHaze = 3.8, atmoGlare = 1.2,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(120, 50, 180),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(15, 5, 35),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(160, 130, 220),
+		ccSaturationEnabled = true, ccSaturation = 0.4, ccContrast = 0.18,
+		["Enabled Ambient"] = true, ambientColor = Color3.fromRGB(30, 10, 60), Brightness = 1.5,
+		weatherEnabled = true, weatherType = "Stardust", weatherIntensity = 145,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Skeleton ESP"] = true,
+		boxESPcolor = Color3.fromRGB(160, 100, 255), chamsVisibleColor = Color3.fromRGB(130, 70, 230),
+		chamsWallColor = Color3.fromRGB(80, 0, 160),
+	},
+	["Golden Hour"] = {
+		["Skybox Changer"] = true, skyboxValue = "Morning Glow",
+		["Time Changer"] = true, time = 7.5, celestialBodies = true, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 2.6, bloomSize = 22,
+		sunraysEnabled = true, sunraysIntensity = 0.75,
+		atmoEnabled = true, atmoDensity = 0.32, atmoHaze = 1.8, atmoGlare = 1.4,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(255, 210, 140),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(255, 160, 80),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 230, 180),
+		ccSaturationEnabled = true, ccSaturation = 0.35, ccExposure = 0.12,
+		["Enabled Ambient"] = true, ambientColor = Color3.fromRGB(140, 100, 60), Brightness = 2.8,
+		espEnabled = true, Chams = true, ["Box ESP"] = true,
+		boxESPcolor = Color3.fromRGB(255, 220, 140), chamsVisibleColor = Color3.fromRGB(255, 200, 100),
+		chamsWallColor = Color3.fromRGB(255, 150, 60),
+	},
+	["Matrix Rain"] = {
+		["Skybox Changer"] = true, skyboxValue = "Green Sky",
+		["Time Changer"] = true, time = 1, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 3, bloomSize = 26,
+		atmoEnabled = true, atmoDensity = 0.4, atmoHaze = 2, atmoGlare = 0.6,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(0, 255, 100),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(0, 60, 30),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(120, 255, 160),
+		ccSaturationEnabled = true, ccSaturation = 0.5, ccContrast = 0.3,
+		["Fog Changer"] = true, fogStart = 0, fogEnd = 300, fogColor = Color3.fromRGB(0, 40, 20),
+		weatherEnabled = true, weatherType = "Heavy Rain", weatherIntensity = 130,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Skeleton ESP"] = true,
+		boxESPcolor = Color3.fromRGB(0, 255, 100), skeletonColor = Color3.fromRGB(100, 255, 150),
+		chamsVisibleColor = Color3.fromRGB(0, 230, 90), chamsWallColor = Color3.fromRGB(0, 180, 70),
+	},
+	["Pink Paradise"] = {
+		["Skybox Changer"] = true, skyboxValue = "Pink Daylight",
+		["Time Changer"] = true, time = 15, celestialBodies = true, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 4, bloomSize = 34,
+		sunraysEnabled = true, sunraysIntensity = 0.4,
+		atmoEnabled = true, atmoDensity = 0.36, atmoHaze = 1.6, atmoGlare = 1.2,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(255, 150, 210),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(255, 100, 180),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 190, 230),
+		ccSaturationEnabled = true, ccSaturation = 0.65,
+		weatherEnabled = true, weatherType = "Stardust", weatherIntensity = 125,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Name ESP"] = true,
+		boxESPcolor = Color3.fromRGB(255, 150, 210), nameESPcolor = Color3.fromRGB(255, 200, 240),
+		chamsVisibleColor = Color3.fromRGB(255, 120, 200), chamsWallColor = Color3.fromRGB(255, 180, 230),
+	},
+	["Deep Ocean"] = {
+		["Skybox Changer"] = true, skyboxValue = "Neptune",
+		["Time Changer"] = true, time = 5, celestialBodies = true, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 3.2, bloomSize = 28,
+		atmoEnabled = true, atmoDensity = 0.5, atmoHaze = 2.8, atmoGlare = 1,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(40, 120, 255),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(5, 30, 90),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(120, 180, 255),
+		ccSaturationEnabled = true, ccSaturation = 0.4,
+		["Fog Changer"] = true, fogStart = 0, fogEnd = 320, fogColor = Color3.fromRGB(10, 40, 100),
+		weatherEnabled = true, weatherType = "Light Rain", weatherIntensity = 90,
+		espEnabled = true, Chams = true, ["Box ESP"] = true,
+		boxESPcolor = Color3.fromRGB(80, 160, 255), chamsVisibleColor = Color3.fromRGB(60, 140, 255),
+		chamsWallColor = Color3.fromRGB(0, 80, 200),
+	},
+	["Electric Storm"] = {
+		["Skybox Changer"] = true, skyboxValue = "Stormy Sky",
+		["Time Changer"] = true, time = 20, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 3.4, bloomSize = 30,
+		atmoEnabled = true, atmoDensity = 0.65, atmoHaze = 4.5, atmoGlare = 0.7,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(60, 80, 140),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(20, 25, 50),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(140, 160, 255),
+		ccSaturationEnabled = true, ccSaturation = 0.3, ccContrast = 0.2,
+		["Fog Changer"] = true, fogStart = 0, fogEnd = 250, fogColor = Color3.fromRGB(30, 35, 70),
+		weatherEnabled = true, weatherType = "Heavy Rain", weatherIntensity = 175,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Bullet Tracers"] = true,
+		boxESPcolor = Color3.fromRGB(140, 180, 255), chamsVisibleColor = Color3.fromRGB(100, 150, 255),
+		chamsWallColor = Color3.fromRGB(60, 80, 200), tracerColor = Color3.fromRGB(180, 200, 255),
+	},
+	["Light Within"] = {
+		["Skybox Changer"] = true, skyboxValue = "Light Within Dark",
+		["Time Changer"] = true, time = 0.8, celestialBodies = true, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 4.8, bloomSize = 42,
+		sunraysEnabled = true, sunraysIntensity = 0.6,
+		atmoEnabled = true, atmoDensity = 0.44, atmoHaze = 2.2, atmoGlare = 2,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(255, 240, 200),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(80, 60, 120),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 245, 220),
+		ccSaturationEnabled = true, ccSaturation = 0.3, ccExposure = 0.18,
+		weatherEnabled = true, weatherType = "Stardust", weatherIntensity = 155,
+		espEnabled = true, Chams = true, ["Box ESP"] = true, ["Skeleton ESP"] = true, ["Name ESP"] = true,
+		boxESPcolor = Color3.fromRGB(255, 240, 200), skeletonColor = Color3.fromRGB(255, 220, 160),
+		chamsVisibleColor = Color3.fromRGB(255, 230, 180), chamsWallColor = Color3.fromRGB(180, 140, 255),
+	},
+	Redshift = {
+		["Skybox Changer"] = true, skyboxValue = "Redshift",
+		["Time Changer"] = true, time = 19, auroraEnabled = true,
+		bloomEnabled = true, bloomIntensity = 3.5, bloomSize = 30,
+		sunraysEnabled = true, sunraysIntensity = 0.55,
+		atmoEnabled = true, atmoDensity = 0.5, atmoHaze = 2.6, atmoGlare = 1.3,
+		["Atmosphere Color"] = true, atmoColor = Color3.fromRGB(255, 90, 90),
+		["Decay Color"] = true, atmoDecay = Color3.fromRGB(120, 20, 40),
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 160, 140),
+		ccSaturationEnabled = true, ccSaturation = 0.48,
+		weatherEnabled = true, weatherType = "Ash", weatherIntensity = 85,
+		espEnabled = true, Chams = true, ["Box ESP"] = true,
+		boxESPcolor = Color3.fromRGB(255, 100, 100), chamsVisibleColor = Color3.fromRGB(255, 80, 80),
+		chamsWallColor = Color3.fromRGB(255, 180, 80),
+	},
+	["Minecraft Dreams"] = {
+		["Skybox Changer"] = true, skyboxValue = "Minecraft",
+		["Time Changer"] = true, time = 12, celestialBodies = true, auroraEnabled = false,
+		bloomEnabled = true, bloomIntensity = 2.4, bloomSize = 20,
+		ccTintEnabled = true, ccTintColor = Color3.fromRGB(255, 245, 210),
+		ccSaturationEnabled = true, ccSaturation = 0.35, ccExposure = 0.08,
+		["Enabled Ambient"] = true, ambientColor = Color3.fromRGB(120, 120, 100), Brightness = 2.5,
+		weatherEnabled = true, weatherType = "Snow", weatherIntensity = 70,
+		espEnabled = true, Chams = true, ["Box ESP"] = true,
+		boxESPcolor = Color3.fromRGB(100, 255, 100), chamsVisibleColor = Color3.fromRGB(80, 220, 80),
+		chamsWallColor = Color3.fromRGB(255, 200, 80),
+	},
+}
+val_933 = { "HumanoidRootPart", "FakeHead", "C4", "Gun" }; val_940 = false
 function hitChams(var_95, var_114, var_134, var_179)
 	if var_95.Character and not val_940 then
 		val_940 = true 
@@ -2875,7 +3204,7 @@ function val_440:GetTabs()
 			return
 		end 
 		if env.CB_SilentDebug and val_671:IsMouseButtonPressed(0) then
-			if string.find(val_438, "FindPartOnRay") or val_438 == "Raycast" then
+			if type(val_438) == "string" and (string.find(val_438, "FindPartOnRay") or val_438 == "Raycast") then
 				warn("[clarity SilentDbg] " .. val_438 .. " @ " .. tostring(var_270))
 			elseif val_438 == "FireServer" and (val_439 == "HitParl" or val_439 == "Whizz" or val_439 == "Trail" or val_439 == "ReplicateShot") then
 				warn("[clarity SilentDbg] " .. val_439 .. " fired")
@@ -2883,7 +3212,7 @@ function val_440:GetTabs()
 		end
 		local isSilentActive = env.silentAimEnabled and env.target
 		if isSilentActive then
-			if string.find(val_438, "FindPartOnRay") then
+			if type(val_438) == "string" and string.find(val_438, "FindPartOnRay") then
 				local val_444, _, val_443 = buildSilentRay(env.target)
 				if env.CB_SilentDebug then
 					warn("[clarity Silent] redirect FindPartOnRay -> " .. env.target.Name)
@@ -3054,6 +3383,17 @@ function val_440:GetTabs()
 				end
 				if library_flags["KillAllAuto"] then
 					args[2] = {X = 0/0, Y = 0/0, Z = 0/0}
+				elseif hitPart then
+					local loopKills = library_flags["PlayerLoopKills"]
+					if loopKills then
+						local model = hitPart:FindFirstAncestorWhichIsA("Model")
+						if model then
+							local hitPlr = val_413:GetPlayerFromCharacter(model)
+							if hitPlr and loopKills[hitPlr.Name] then
+								args[2] = {X = 0/0, Y = 0/0, Z = 0/0}
+							end
+						end
+					end
 				end
 				if not hitPart or not hitPart.Parent then
 					return oldNamecall(var_270, unpack(args, 1, args.n))
@@ -3233,6 +3573,10 @@ visualsMaster:AddToggle({
 	text = "Visible Only", flag = "Visible Only ESP",
 	callback = function() if cbCHAMS then cbCHAMS() end end
 })
+visualsMaster:AddSlider({ text = "Opacity", flag = "espOpacity", min = 0, max = 100, value = 100, suffix = "%", tip = "global transparency for all esp drawing elements" })
+env.espDrawOpacity = function()
+	return math.clamp((library_flags["espOpacity"] or 100) / 100, 0, 1)
+end
 visualsChams = visualsColumn:AddSection"Chams"
 env.__chamsRefresh = function()
 	if library_flags["espEnabled"] and library_flags["Chams"] then
@@ -3390,6 +3734,7 @@ local function hideObject(instance)
 			if not instance or (not instance:IsA("GuiObject") and not instance:IsA("UIStroke")) then return end
 			if instance:IsA("ScreenGui") then return end
 			local whitelist = {"BuyMenu", "Crosshair", "Crosshairs", "SuitZoom", "Scope", "Cursor", "Reticle"}
+			if library_flags["Hitlogs"] and (instance.Name == "KillFeed" or instance:FindFirstAncestor("KillFeed")) then return end
 			for _, name in whitelist do
 				if instance.Name == name or instance:FindFirstAncestor(name) then return end
 			end
@@ -3521,30 +3866,13 @@ tpToggle:AddBind({
 	end
 })
 visualsLocal:AddSlider({ text = "Third Person Distance", flag = "thirdPersonDistance", min = 5, max = 25, value = 10, callback = applyThirdPerson })
-visualsLocal:AddToggle({ text = "Grenade Predictor", flag = "grenadePredictor" }):AddColor({ color = Color3.fromRGB(255, 50, 50), flag = "grenadeColor" }); visualsLocal:AddToggle({ text = "Custom Crosshair", flag = "customCrosshair" }):AddColor({ color = Color3.fromRGB(0, 255, 0), flag = "crosshairColor" }); visualsLocal:AddSlider({ text = "Crosshair Size", flag = "crSize", value = 8, min = 2, max = 20 }); visualsLocal:AddSlider({ text = "Crosshair Gap", flag = "crGap", value = 4, min = 0, max = 20 }); visualsLocal:AddSlider({ text = "Crosshair Thickness", flag = "crThickness", value = 1, min = 1, max = 5 }); visualsLocal:AddToggle({ text = "Crosshair Spin", flag = "crSpin" }); crosshairLines = {}
+visualsLocal:AddToggle({ text = "Grenade Predictor", flag = "grenadePredictor" }):AddColor({ color = Color3.fromRGB(255, 50, 50), flag = "grenadeColor" }); visualsLocal:AddSlider({ text = "Crosshair Size", flag = "crSize", value = 8, min = 2, max = 20 }); visualsLocal:AddSlider({ text = "Crosshair Gap", flag = "crGap", value = 4, min = 0, max = 20 }); visualsLocal:AddSlider({ text = "Crosshair Thickness", flag = "crThickness", value = 1, min = 1, max = 5 }); visualsLocal:AddToggle({ text = "Crosshair Spin", flag = "crSpin" }); crosshairLines = {}
 for i = 1, 4 do
 	local l = Drawing.new("Line"); l.Visible = false; l.Color = Color3.new(0, 1, 0); l.Thickness = 1; l.Transparency = 1; table.insert(crosshairLines, l)
 end
 crAngle = 0
 game:GetService("RunService").RenderStepped:Connect(function()
-	local enabled = library_flags["customCrosshair"]
-	if not enabled then
-		for _, l in crosshairLines do l.Visible = false end
-		return
-	end
-	local center = workspace.CurrentCamera.ViewportSize / 2; local size = library_flags["crSize"] or 8; local gap = library_flags["crGap"] or 4; local thick = library_flags["crThickness"] or 1; local col = library_flags["crosshairColor"] or Color3.new(0,1,0); local isSpin = library_flags["crSpin"]
-	if isSpin then
-		crAngle = crAngle + 2
-		if crAngle > 360 then crAngle = 0 end
-	else
-		crAngle = 0
-	end
-	local rad = math.rad(crAngle); local cosA, sinA = math.cos(rad), math.sin(rad)
-	local function rotate(x, y) return Vector2.new(x * cosA - y * sinA, x * sinA + y * cosA) end
-	local dirs = {Vector2.new(0, -1), Vector2.new(0, 1), Vector2.new(-1, 0), Vector2.new(1, 0)}
-	for i = 1, 4 do
-		local l = crosshairLines[i]; l.Visible = true; l.Color = col; l.Thickness = thick; local dir = rotate(dirs[i].X, dirs[i].Y); l.From = center + (dir * gap); l.To = center + (dir * (gap + size))
-	end
+	for _, l in crosshairLines do l.Visible = false end
 end)
 val_662.Particles.Light.Range = 0 
 local function GetLightingEffect(classname)
@@ -3559,14 +3887,26 @@ local function GetLightingEffect(classname)
 	return eff
 end
 worldCol1 = visualsGame:AddColumn(); worldCol2 = visualsGame:AddColumn()
-lightingSection = worldCol1:AddSection"Lighting"; skySection = worldCol1:AddSection"Sky"; fogSection = worldCol1:AddSection"Fog"; mapCustomSection = worldCol1:AddSection"Map Customization"
+lightingSection = worldCol1:AddSection"Lighting"; skySection = worldCol1:AddSection"Sky"; fogSection = worldCol1:AddSection"Fog"
 bloomSection = worldCol2:AddSection"Bloom"; sunRaysSection = worldCol2:AddSection"Sun Rays"; dofSection = worldCol2:AddSection"Depth of Field"; atmosphereSection = worldCol2:AddSection"Atmosphere"; terrainSection = worldCol2:AddSection"Terrain"
 
-mapCustomSection:AddToggle({ text = "Override Materials", flag = "overrideMaterials" })
-mapCustomSection:AddList({ text = "Map Material", flag = "overrideMaterialsType", values = { "SmoothPlastic", "Neon", "ForceField", "Glass", "Ice", "Foil" }, value = "SmoothPlastic" })
-mapCustomSection:AddToggle({ text = "Remove Textures", flag = "removeTextures" })
-mapCustomSection:AddToggle({ text = "Remove Map Particles", flag = "removeMapParticles" })
-mapCustomSection:AddList({ text = "Custom Weather", flag = "customWeather", values = { "Default", "Clear", "Rain", "Snow" }, value = "Default" })
+presetSection = worldCol1:AddSection"Visual Presets"
+presetSection:AddList({
+	text = "Theme", flag = "visualPreset", value = "Off", max = 22,
+	values = {
+		"Off", "Stardust", "Neon Night", "Blood Moon", "Vaporwave", "Cyber Dream", "Galaxy Rush",
+		"Sunset Blaze", "Toxic Glow", "Anime Heaven", "Inferno", "Crystal Ice", "Oblivion Void",
+		"Golden Hour", "Matrix Rain", "Pink Paradise", "Deep Ocean", "Electric Storm", "Light Within",
+		"Redshift", "Minecraft Dreams",
+	},
+	callback = function(val)
+		if val and val ~= "Off" and env.applyVisualPreset then
+			env.applyVisualPreset(val)
+		elseif val == "Off" then
+			pcall(env.setAurora)
+		end
+	end
+})
 uiLoaded = false
 function applyLighting()
 	pcall(function()
@@ -3578,10 +3918,14 @@ function applyLighting()
 		dof.Enabled = library_flags["dofEnabled"] == true; dof.FocusDistance = library_flags["dofFocus"] or 0; dof.InFocusRadius = library_flags["dofRadius"] or 25; dof.FarIntensity = library_flags["dofFar"] or 0.75; dof.NearIntensity = library_flags["dofNear"] or 0
 		local atmo = GetLightingEffect("Atmosphere")
 		atmo.Density = library_flags["atmoEnabled"] and (library_flags["atmoDensity"] or 0.3) or 0; atmo.Haze = library_flags["atmoHaze"] or 0; atmo.Glare = library_flags["atmoGlare"] or 0
+		if library_flags["atmoEnabled"] then
+			if library_flags["atmoColor"] then atmo.Color = library_flags["atmoColor"] end
+			if library_flags["atmoDecay"] then atmo.Decay = library_flags["atmoDecay"] end
+		end
 	end)
 end
 task.spawn(function()
-	task.wait(1.5); uiLoaded = true; applyLighting()
+	task.wait(1.5); uiLoaded = true; pcall(env.setAurora); applyLighting()
 end)
 lightingSection:AddToggle({
 	text = "Better Shadows",
@@ -3674,6 +4018,58 @@ skySection:AddToggle({
 	flag = "skyboxValue",
 	callback = function() updateSkybox() end
 })
+postSection = worldCol2:AddSection"Post Processing"
+postSection:AddToggle({
+	text = "Tint", flag = "ccTintEnabled",
+	callback = function() env.applyPostProcessing() end
+}):AddColor({
+	flag = "ccTintColor", color = Color3.fromRGB(255, 255, 255),
+	callback = function() env.applyPostProcessing() end
+})
+postSection:AddSlider({
+	text = "Contrast", flag = "ccContrast", min = -1, max = 1, float = 0.05, value = 0,
+	callback = function() env.applyPostProcessing() end
+})
+postSection:AddSlider({
+	text = "Exposure", flag = "ccExposure", min = -0.5, max = 0.5, float = 0.02, value = 0,
+	callback = function() env.applyPostProcessing() end
+})
+postSection:AddSlider({
+	text = "Saturation", flag = "ccSaturation", min = -1, max = 1, float = 0.05, value = 0,
+	callback = function()
+		if not uiLoaded then return end
+		if library_flags["ccSaturationEnabled"] and val_796 then
+			val_796.Saturation = library_flags["ccSaturation"] or 0
+		end
+	end
+})
+postSection:AddToggle({
+	text = "Custom Saturation", flag = "ccSaturationEnabled",
+	callback = function(v)
+		if not uiLoaded then return end
+		if not v and library_flags["Saturation"] then
+			val_796.Saturation = library_flags["saturationValue"] / 50
+		elseif v then
+			val_796.Saturation = library_flags["ccSaturation"] or 0
+		else
+			val_796.Saturation = 0
+		end
+	end
+})
+lightingSection:AddToggle({
+	text = "Global Shadows", flag = "globalShadows", state = true,
+	callback = function(v)
+		if not uiLoaded then return end
+		val_699.GlobalShadows = v ~= false
+	end
+})
+lightingSection:AddSlider({
+	text = "Shadow Softness", flag = "shadowSoftness", min = 0, max = 1, float = 0.05, value = 0.2,
+	callback = function(v)
+		if not uiLoaded then return end
+		pcall(function() val_699.ShadowSoftness = v end)
+	end
+})
 bloomSection:AddToggle({
 	text = "Enabled", flag = "bloomEnabled",
 	callback = function(v) if not uiLoaded then return end pcall(function() GetLightingEffect("BloomEffect").Enabled = v end) end
@@ -3745,7 +4141,7 @@ sunRaysSection:AddSlider({
 })
 do
 weatherSection = worldCol1:AddSection"Weather"
-WEATHER_PRESETS = { ["Snow"] = { Count = 120, Color = Color3.fromRGB(255,255,255), Size = Vector3.new(0.14,0.14,0.14), Speed = 18, Drift = 8, Transparency = 0.15, Material = Enum.Material.Neon, }, ["Light Rain"] = { Count = 90, Color = Color3.fromRGB(150,190,255), Size = Vector3.new(0.035,2.8,0.035), Speed = 95, Drift = 3, Transparency = 0.25, Material = Enum.Material.Neon, }, ["Heavy Rain"] = { Count = 170, Color = Color3.fromRGB(130,180,255), Size = Vector3.new(0.045,4.2,0.045), Speed = 145, Drift = 7, Transparency = 0.15, Material = Enum.Material.Neon, }, ["Ash"] = { Count = 130, Color = Color3.fromRGB(255,120,45), Size = Vector3.new(0.22,0.22,0.22), Speed = 9, Drift = 20, Transparency = 0.2, Material = Enum.Material.Neon, }, }
+WEATHER_PRESETS = { ["Snow"] = { Count = 120, Color = Color3.fromRGB(255,255,255), Size = Vector3.new(0.14,0.14,0.14), Speed = 18, Drift = 8, Transparency = 0.15, Material = Enum.Material.Neon, Ball = true }, ["Light Rain"] = { Count = 90, Color = Color3.fromRGB(150,190,255), Size = Vector3.new(0.035,2.8,0.035), Speed = 95, Drift = 3, Transparency = 0.25, Material = Enum.Material.Neon, Ball = false }, ["Heavy Rain"] = { Count = 170, Color = Color3.fromRGB(130,180,255), Size = Vector3.new(0.045,4.2,0.045), Speed = 145, Drift = 7, Transparency = 0.15, Material = Enum.Material.Neon, Ball = false }, ["Ash"] = { Count = 130, Color = Color3.fromRGB(255,120,45), Size = Vector3.new(0.22,0.22,0.22), Speed = 9, Drift = 20, Transparency = 0.2, Material = Enum.Material.Neon, Ball = true }, ["Stardust"] = { Count = 180, Color = Color3.fromRGB(210,130,255), Size = Vector3.new(0.1,0.1,0.1), Speed = -10, Drift = 16, Transparency = 0.18, Material = Enum.Material.Neon, Ball = true, Glow = true }, ["Neon Dust"] = { Count = 140, Color = Color3.fromRGB(80,240,255), Size = Vector3.new(0.08,0.08,0.08), Speed = -8, Drift = 12, Transparency = 0.2, Material = Enum.Material.Neon, Ball = true, Glow = true }, }
 weatherFolder = Instance.new("Folder"); weatherFolder.Name = "Weather"; weatherFolder.Parent = workspace; weatherParts = {}
 rng = Random.new()
 local function clearWeather()
@@ -3762,8 +4158,14 @@ local function makeWeatherPart(preset)
 	local part = Instance.new("Part"); part.Name = "WeatherDrop"; part.Anchored = true; part.CanCollide = false; part.CanQuery = false; part.CanTouch = false
 	part.CastShadow = false
 	part.Material = preset.Material; part.Color = preset.Color; part.Size = preset.Size; part.Transparency = preset.Transparency; part.Parent = weatherFolder
-	if library_flags["weatherType"] == "Snow" or library_flags["weatherType"] == "Ash" then
+	if preset.Ball then
 		part.Shape = Enum.PartType.Ball
+	end
+	if preset.Glow then
+		local light = Instance.new("PointLight", part)
+		light.Color = preset.Color
+		light.Brightness = 0.6
+		light.Range = 8
 	end
 	return part
 end
@@ -3777,7 +4179,6 @@ local function applyWeather()
 			weatherParts[i].CFrame = CFrame.new(randomWeatherPosition(cam))
 		end
 	end
-	warn("[WEATHER] spawned visible " .. tostring(library_flags["weatherType"]) .. " parts=" .. tostring(count))
 end
 weatherSection:AddToggle({
 	text = "Enabled", flag = "weatherEnabled",
@@ -3786,7 +4187,7 @@ weatherSection:AddToggle({
 	end
 })
 weatherSection:AddList({
-	text = "Type", flag = "weatherType", values = {"Snow", "Light Rain", "Heavy Rain", "Ash"}, value = "Snow",
+	text = "Type", flag = "weatherType", values = {"Snow", "Light Rain", "Heavy Rain", "Ash", "Stardust", "Neon Dust"}, value = "Snow",
 	callback = function() applyWeather() end
 })
 weatherSection:AddSlider({
@@ -3800,8 +4201,13 @@ game:GetService("RunService").RenderStepped:Connect(function()
 			local toMoveParts = {}; local toMoveCFs = {}; local t = tick()
 			for i, p in weatherParts do
 				if p and p.Parent then
-					local phase = i * 0.37; local drift = Vector3.new(math.sin(t + phase) * preset.Drift, 0, math.cos(t * 0.8 + phase) * preset.Drift); local newCf = p.CFrame + ((Vector3.new(0, -preset.Speed, 0) + drift) * (1 / 60))
-					if p.Position.Y < cam.CFrame.Position.Y - 18 or (p.Position - cam.CFrame.Position).Magnitude > 170 then
+					local phase = i * 0.37; local drift = Vector3.new(math.sin(t + phase) * preset.Drift, 0, math.cos(t * 0.8 + phase) * preset.Drift); local fall = preset.Speed >= 0 and Vector3.new(0, -preset.Speed, 0) or Vector3.new(0, -preset.Speed, 0); local newCf = p.CFrame + ((fall + drift) * (1 / 60))
+					local camY = cam.CFrame.Position.Y
+					if preset.Speed < 0 then
+						if p.Position.Y > camY + 110 or (p.Position - cam.CFrame.Position).Magnitude > 170 then
+							newCf = CFrame.new(randomWeatherPosition(cam))
+						end
+					elseif p.Position.Y < camY - 18 or (p.Position - cam.CFrame.Position).Magnitude > 170 then
 						newCf = CFrame.new(randomWeatherPosition(cam))
 					end
 					table.insert(toMoveParts, p); table.insert(toMoveCFs, newCf)
@@ -3813,6 +4219,43 @@ game:GetService("RunService").RenderStepped:Connect(function()
 		end
 	end
 end)
+env.applyWeather = applyWeather
+end
+env.applyVisualPreset = function(name)
+	local preset = env.VISUAL_PRESETS and env.VISUAL_PRESETS[name]
+	if not preset then return end
+	for flag, value in preset do
+		library_flags[flag] = value
+		local opt = UI_Library.options[flag]
+		if opt then
+			if opt.type == "toggle" and opt.SetState then
+				pcall(function() opt:SetState(value == true) end)
+			elseif opt.type == "slider" and opt.SetValue then
+				pcall(function() opt:SetValue(value) end)
+			elseif opt.type == "color" and opt.SetColor then
+				pcall(function() opt:SetColor(value) end)
+			elseif opt.type == "list" and opt.SetValue then
+				pcall(function() opt:SetValue(value) end)
+			end
+		end
+	end
+	pcall(updateSkybox)
+	pcall(applyLighting)
+	pcall(env.applyPostProcessing)
+	pcall(function()
+		if library_flags["Enabled Ambient"] then
+			val_699.Ambient = library_flags["ambientColor"] or val_699.Ambient
+		end
+		if library_flags["Brightness"] then val_699.Brightness = library_flags["Brightness"] end
+		if library_flags["Fog Changer"] then
+			val_699.FogStart = library_flags["fogStart"] or 0
+			val_699.FogEnd = library_flags["fogEnd"] or 100000
+			if library_flags["fogColor"] then val_699.FogColor = library_flags["fogColor"] end
+		end
+	end)
+	pcall(env.setAurora)
+	if env.applyWeather then pcall(env.applyWeather) end
+	if cbCHAMS then pcall(cbCHAMS) end
 end
 terrainSection:AddToggle({
 	text = "Enabled Grass",
@@ -3830,9 +4273,229 @@ terrainSection:AddSlider({
 	text = "Water Wave Speed", min = 0, max = 100, float = 1, value = 10,
 	callback = function(v) pcall(function() workspace.Terrain.WaterWaveSpeed = v end) end
 })
-visualsScreenCol = visualsScreen:AddColumn(); miscMain = visualsScreenCol:AddSection"General"; movementTab = UI_Library:AddTab"Movement"; movementGeneral = movementTab:AddSubTab("General"); miscColumn = movementGeneral:AddColumn(); miscColumn2 = movementGeneral:AddColumn(); fakeLagDebounce = false; jumpbugging = false; noclipping = false; surfing = false 
+visualsScreenCol1 = visualsScreen:AddColumn()
+visualsScreenCol2 = visualsScreen:AddColumn()
+screenIndicators = visualsScreenCol1:AddSection("indicators")
+screenGraphs = visualsScreenCol1:AddSection("graphs")
+screenHud = visualsScreenCol2:AddSection("hud")
+env._defaultHudColor = nil
+env.applyScaleformHud = function(on)
+	pcall(function()
+		local pg = val_733.PlayerGui
+		local newGui = pg:WaitForChild("GUI")
+		local oldGui = pg:WaitForChild("Game")
+		if env._scaleformSyncConn then
+			env._scaleformSyncConn:Disconnect()
+			env._scaleformSyncConn = nil
+		end
+		if env._scaleformGameConn then
+			env._scaleformGameConn:Disconnect()
+			env._scaleformGameConn = nil
+		end
+		if env._scaleformHideConns then
+			for _, conn in env._scaleformHideConns do conn:Disconnect() end
+			env._scaleformHideConns = nil
+		end
+		if on then
+			newGui.Enabled = true
+			oldGui.Enabled = true
+			env._scaleformHidden = env._scaleformHidden or {}
+			env._scaleformHideConns = {}
+			local keep = { Crosshairs = true, Defusal = true, Notify = true }
+			for _, child in newGui:GetChildren() do
+				if child:IsA("GuiObject") and not keep[child.Name] then
+					if env._scaleformHidden[child] == nil then
+						env._scaleformHidden[child] = child.Visible
+					end
+					child.Visible = false
+					table.insert(env._scaleformHideConns, child:GetPropertyChangedSignal("Visible"):Connect(function()
+						if library_flags["scaleformHud"] and child.Visible then
+							child.Visible = false
+						end
+					end))
+				end
+			end
+			env._scaleformSyncConn = newGui:GetPropertyChangedSignal("Enabled"):Connect(function()
+				if library_flags["scaleformHud"] then
+					if not newGui.Enabled then newGui.Enabled = true end
+					if not oldGui.Enabled then oldGui.Enabled = true end
+				end
+			end)
+			env._scaleformGameConn = oldGui:GetPropertyChangedSignal("Enabled"):Connect(function()
+				if library_flags["scaleformHud"] and not oldGui.Enabled then
+					oldGui.Enabled = true
+				end
+			end)
+		else
+			local cache = env._scaleformHidden
+			if cache then
+				for inst, vis in cache do
+					if inst and inst.Parent then
+						inst.Visible = vis
+					end
+				end
+			end
+			env._scaleformHidden = nil
+		end
+	end)
+end
+env.applyCustomHudColor = function()
+	pcall(function()
+		local on = library_flags["customCrosshair"] == true
+		local col = library_flags["crosshairColor"] or Color3.fromRGB(0, 255, 0)
+		local client = val_733.PlayerGui:FindFirstChild("Client")
+		if client and client:FindFirstChild("HackyColorReplication") then
+			if on then
+				if not env._defaultHudColor then
+					env._defaultHudColor = client.HackyColorReplication.Value
+				end
+				client.HackyColorReplication.Value = col
+			elseif env._defaultHudColor then
+				client.HackyColorReplication.Value = env._defaultHudColor
+			end
+		end
+		local gui = val_733.PlayerGui:FindFirstChild("GUI")
+		local ch = gui and gui:FindFirstChild("Crosshairs") and gui.Crosshairs:FindFirstChild("Crosshair")
+		if ch and on then
+			for _, name in { "BottomFrame", "LeftFrame", "RightFrame", "TopFrame", "Dot", "Center1" } do
+				local frame = ch:FindFirstChild(name)
+				if frame then
+					if frame:IsA("GuiObject") and frame.BackgroundColor3 then
+						frame.BackgroundColor3 = col
+					end
+					if frame:IsA("ImageLabel") then
+						frame.ImageColor3 = col
+					end
+				end
+			end
+		end
+	end)
+end
+env._bombExplosionTime = nil
+local BOMB_TIMER_DURATION = 40
+env.clearBombTimerHud = function()
+	env._bombExplosionTime = nil
+end
+env.markBombPlanted = function()
+	env._bombExplosionTime = tick() + BOMB_TIMER_DURATION
+end
+workspace.ChildAdded:Connect(function(child)
+	if child.Name == "C4" then
+		env.markBombPlanted()
+	end
+end)
+workspace.ChildRemoved:Connect(function(child)
+	if child.Name == "C4" then
+		env.clearBombTimerHud()
+	end
+end)
+task.spawn(function()
+	local status = workspace:WaitForChild("Status")
+	if status:FindFirstChild("Exploded") then
+		status.Exploded.Changed:Connect(function()
+			if status.Exploded.Value then
+				env.clearBombTimerHud()
+			end
+		end)
+	end
+	if status:FindFirstChild("Defused") then
+		status.Defused.Changed:Connect(function()
+			if status.Defused.Value then
+				env.clearBombTimerHud()
+			end
+		end)
+	end
+	if workspace:FindFirstChild("C4") then
+		env.markBombPlanted()
+	end
+end)
+env.updateScreenHud = function()
+	pcall(function()
+		local gameGui = val_733.PlayerGui:FindFirstChild("Game")
+		if library_flags["engineRadar"] and gameGui and gameGui:FindFirstChild("Radar") then
+			gameGui.Radar.Visible = true
+			local loc = gameGui.Radar:FindFirstChild("Location")
+			if loc and val_733:FindFirstChild("Location") then
+				loc.Visible = true
+			end
+		end
+		if library_flags["bombTimerHud"] then
+			local status = workspace:FindFirstChild("Status")
+			local c4 = workspace:FindFirstChild("C4")
+			if not env._bombTimerText then
+				env._bombTimerText = Drawing.new("Text")
+				env._bombTimerText.Center = true
+				env._bombTimerText.Outline = true
+				env._bombTimerText.Font = 3
+				env._bombTimerText.Size = 20
+				env._bombTimerText.Color = Color3.fromRGB(255, 70, 70)
+			end
+			if c4 and not env._bombExplosionTime then
+				env.markBombPlanted()
+			end
+			local defused = status and status:FindFirstChild("Defused") and status.Defused.Value
+			local show = c4 and status and status:FindFirstChild("Exploded") and not status.Exploded.Value and not defused
+			if show and env._bombExplosionTime then
+				local remaining = math.max(0, math.ceil(env._bombExplosionTime - tick()))
+				env._bombTimerText.Text = string.format("BOMB %d", remaining)
+				env._bombTimerText.Position = Vector2.new(val_749.ViewportSize.X / 2, 42)
+				env._bombTimerText.Visible = true
+			else
+				env._bombTimerText.Visible = false
+			end
+		elseif env._bombTimerText then
+			env._bombTimerText.Visible = false
+		end
+	end)
+end
+task.spawn(function()
+	pcall(function()
+		val_733:WaitForChild("PlayerGui"):WaitForChild("Game")
+		if library_flags["scaleformHud"] then env.applyScaleformHud(true) end
+		if env.applyCustomHudColor then env.applyCustomHudColor() end
+	end)
+end)
+movementTab = UI_Library:AddTab"Movement"
+movementGeneral = movementTab:AddSubTab("General")
+miscColumn = movementGeneral:AddColumn()
+miscColumn2 = movementGeneral:AddColumn()
+fakeLagDebounce = false
+jumpbugging = false
+noclipping = false
+surfing = false
+screenIndicators:AddToggle({ text = "Drawing Enabled", flag = "Drawing Enabled", state = true, screenPanel = "features" })
+screenIndicators:AddToggle({ text = "velocity indicator", flag = "Velocity Indicator", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "jumpbug indicator", flag = "showJBInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "edgebug indicator", flag = "showEBInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "pixelsurf indicator", flag = "showPSInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "fireman indicator", flag = "showFMInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "texturebug indicator", flag = "showTBInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "long jump indicator", flag = "showLJInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "airstuck indicator", flag = "showASInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "minijump indicator", flag = "showMJInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "jetpack indicator", flag = "showJPInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "wallclimb indicator", flag = "showWCInd", screenPanel = "features" })
+screenIndicators:AddToggle({ text = "ladderbug indicator", flag = "showLBInd", screenPanel = "features" })
+screenIndicators:AddList({ text = "indicator font", flag = "indFont", values = { "UI", "System", "Plex", "Monospace" }, screenPanel = "preferences" })
+screenIndicators:AddSlider({ text = "indicator size", flag = "indSize", min = 12, max = 30, value = 18, screenPanel = "preferences" })
+screenGraphs:AddToggle({ text = "velocity graph", flag = "Velocity Graph", screenPanel = "features" }):AddColor({ color = Color3.fromRGB(255, 255, 255), flag = "velocityGraphColor" })
+screenGraphs:AddToggle({ text = "stamina graph", flag = "Stamina Graph", screenPanel = "features" }):AddColor({ color = Color3.fromRGB(200, 160, 255), flag = "staminaGraphColor" })
+screenGraphs:AddToggle({ text = "strafe graph", flag = "Strafe Graph", screenPanel = "features" })
+screenGraphs:AddToggle({ text = "fps graph", flag = "FPS Graph", screenPanel = "features" }):AddColor({ color = Color3.fromRGB(120, 255, 120), flag = "fpsGraphColor" })
+screenHud:AddToggle({ text = "scaleform hud", flag = "scaleformHud", screenPanel = "features", callback = function(v)
+	env.applyScaleformHud(v == true)
+end })
+screenHud:AddToggle({ text = "custom default crosshair color", flag = "customCrosshair", screenPanel = "features", callback = function()
+	env.applyCustomHudColor()
+end }):AddColor({ color = Color3.fromRGB(0, 255, 0), flag = "crosshairColor", callback = function()
+	env.applyCustomHudColor()
+end })
+screenHud:AddToggle({ text = "preserve local killfeed", flag = "Hitlogs", screenPanel = "features" })
+screenHud:AddToggle({ text = "log damage", flag = "hitlogDamage", screenPanel = "features" })
+screenHud:AddToggle({ text = "bomb timer hud", flag = "bombTimerHud", screenPanel = "features" })
+screenHud:AddToggle({ text = "engine radar", flag = "engineRadar", screenPanel = "features" })
 edgebugCooldown = false 
-edgebugDebounce = false; edgeBox = nil; lastKnownDirection = Vector3.new(1, 0, 0); edgeDetectionFrames = 0; env.newEdgebugActive = false; env.oldEbActive = false; miscMain:AddToggle({ text = "Hitlogs" }); miscMain:AddToggle({ text = "Log Damage", flag = "hitlogDamage" })
+edgebugDebounce = false; edgeBox = nil; lastKnownDirection = Vector3.new(1, 0, 0); edgeDetectionFrames = 0; env.newEdgebugActive = false; env.oldEbActive = false
 do
 	local notifGui = Instance.new("ScreenGui", game:GetService("CoreGui")); notifGui.Name = "Clarity_HitLogs"; notifGui.ResetOnSpawn = false; notifGui.IgnoreGuiInset = true; local notifContainer = Instance.new("Frame", notifGui); notifContainer.Name = "Container"; notifContainer.AnchorPoint = Vector2.new(0.5, 1); notifContainer.Position = UDim2.new(0.5, 0, 1, -60); notifContainer.Size = UDim2.new(0, 340, 0, 300); notifContainer.BackgroundTransparency = 1; local notifLayout = Instance.new("UIListLayout", notifContainer); notifLayout.Padding = UDim.new(0, 4); notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; notifLayout.SortOrder = Enum.SortOrder.LayoutOrder; notifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom; local notifOrder = 0; local TweenService = game:GetService("TweenService")
 	env.pushNotification = function(text, color, duration)
@@ -3852,8 +4515,10 @@ do
 		end)
 	end)
 end
-miscMain:AddToggle({
-	text = "Spectator List",
+screenHud:AddToggle({
+	text = "spectator list",
+	flag = "Spectator List",
+	screenPanel = "features",
 	callback = function()
 		val_948.Visible = library_flags["Spectator List"]; local currentSpectators = {}
 		while library_flags["Spectator List"] do
@@ -3891,8 +4556,8 @@ miscMain:AddToggle({
 			end
 		end
 	end
-})
-miscMain:AddToggle({ text = "Detect Moderators (Auto-Leave)", flag = "modDetect" }); CB_STAFF_GROUPS = { 13733926, 3098471 }
+}):AddColor({ color = Color3.fromRGB(255, 255, 255), flag = "spectatorListColor" })
+CB_STAFF_GROUPS = { 13733926, 3098471 }
 CB_STAFF_ROLES = { ["tester"] = true, ["content creator"] = true, ["game moderator"] = true, ["contractors"] = true, ["contractor"] = true, ["main developers"] = true, ["main developer"] = true, ["developer"] = true, ["developers"] = true, ["owners"] = true, ["owner"] = true, ["group holder"] = true, ["admin"] = true, ["administrator"] = true, ["moderator"] = true, ["staff"] = true, }
 spawn(function()
 	while task.wait(3) do
@@ -3926,27 +4591,180 @@ spawn(function()
 		end
 	end
 end)
-miscOK = UI_Library:AddWarning({ type = "ok" }); miscMovement = miscColumn:AddSection"Movement"
-miscMovement:AddToggle({ text = "No Crouch Cooldown" })
-miscMovement:AddToggle({ text = "ladder owner", flag = "ladder owner" })
-miscMovement:AddToggle({ text = "Auto Strafe" }); last = Vector3.new(); miscMovement:AddToggle({ text = "Maintain Velocity" })
-miscMovement:AddToggle({
+miscOK = UI_Library:AddWarning({ type = "ok" })
+moveGeneral = miscColumn:AddSection("general")
+moveStrafe = miscColumn:AddSection("strafe")
+moveUtility = miscColumn2:AddSection("utility")
+moveGeneral:AddToggle({
 	text = "Bunny Hop",
 	callback = function()
 	end
 })
-miscMovement:AddList({ text = "Bunny Hop Method", flag = "Bunny Hop Method", values = {"Directional", "A/D"}, value = "A/D" }); miscMovement:AddSlider({ text = "Bunny Hop Speed", min = 18, max = 100, flag = "Speed Value" }); miscIndicators = miscColumn2:AddSection"Indicators"; miscIndicators:AddToggle({ text = "Drawing Enabled" }); miscIndicators:AddToggle({ text = "Velocity Indicator", flag = "Velocity Indicator" }); miscIndicators:AddToggle({ text = "Pixel Surf Indicator", flag = "showPSInd" }); miscIndicators:AddToggle({ text = "Long Jump Indicator", flag = "showLJInd" }); miscIndicators:AddToggle({ text = "Edgebug Indicator", flag = "showEBInd" }); miscIndicators:AddToggle({ text = "Jumpbug Indicator", flag = "showJBInd" }); miscIndicators:AddToggle({ text = "Airstuck Indicator", flag = "showASInd" }); miscIndicators:AddToggle({ text = "Texturebug Indicator", flag = "showTBInd" }); miscIndicators:AddToggle({ text = "Minijump Indicator", flag = "showMJInd" }); miscIndicators:AddToggle({ text = "Fireman Indicator", flag = "showFMInd" }); miscIndicators:AddToggle({ text = "Jetpack Indicator", flag = "showJPInd" }); miscIndicators:AddToggle({ text = "Wallclimb Indicator", flag = "showWCInd" }); miscIndicators:AddToggle({ text = "Ladderbug Indicator", flag = "showLBInd" }); miscIndicators:AddList({ text = "Indicator Font", flag = "indFont", values = { "UI", "System", "Plex", "Monospace" } }); miscIndicators:AddSlider({ text = "Indicator Size", flag = "indSize", min = 12, max = 30, value = 18 }); motionSettings = miscColumn2:AddSection"Movement Settings"; motionSettings:AddSlider({ text = "Jetpack Speed", flag = "jetpackSpeed", min = 10, max = 100, value = 35 }); motionSettings:AddSlider({ text = "Minijump Mult", min = 0.3, max = 0.8, float = 0.1, flag = "mjMult", value = 0.5 }); motionSettings:AddSlider({ text = "Pixel Surf Speed", min = 18, max = 200, value = 25, flag = "pspeed" }); motionSettings:AddSlider({ text = "Long Jump Studs", min = 1, max = 10, value = 1, suffix = "st", flag = "longJumpStuds" })
-motionSettings:AddToggle({ text = "Auto Edge Bug" }); motionSettings:AddToggle({ text = "Auto Pixel Surf", flag = "Auto Pixel Surf" }); motionSettings:AddToggle({ text = "Auto Align", flag = "Auto Align" }); motionSettings:AddList({ text = "Edgebug Mode", flag = "Edgebug Mode", values = {"mimic", "redirectional", "helltracing"}, value = "redirectional" }); motionSettings:AddToggle({ text = "Edgebug Visualizer", flag = "showEBVis" }); motionSettings:AddToggle({ text = "Edgebug Logs", flag = "showEBLogs" }); motionSettings:AddToggle({ text = "Edgebug Badge", flag = "Edgebug Badge" }); blindParts = { "FakeHead", "Gun", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm" }; movementFeatures = miscColumn:AddSection"Movement Features"; val_412 = val_749.ViewportSize.Y - 50; val_436 = Drawing.new("Text"); val_436.Center = true; val_436.Outline = true; val_436.Color = Color3.new(1, 1, 1); val_436.Font = 3; val_436.Size = 20; val_436.Visible = false; oldWalk = val_757.walkupdate; oldSpeedUpdate = val_757.speedupdate
+moveGeneral:AddList({ text = "Bunny Hop Method", flag = "Bunny Hop Method", values = {"Directional", "A/D"}, value = "A/D" })
+moveGeneral:AddSlider({ text = "Bunny Hop Speed", min = 18, max = 100, flag = "Speed Value" })
+moveGeneral:AddToggle({ text = "Auto Edge Bug" })
+moveGeneral:AddToggle({ text = "Auto Pixel Surf", flag = "Auto Pixel Surf" })
+moveGeneral:AddToggle({
+	text = "Jumpbug",
+}):AddBind({
+	key = "none", mode = "hold",
+	callback = function(bool)
+		env.jbBindHeld = bool
+	end
+})
+moveGeneral:AddToggle({
+	text = "Edgebug"
+}):AddBind({
+	key = "none", mode = "hold",
+	callback = function(bool)
+		env.ebHolding = not bool
+		if not bool then
+			val_830 = true
+		else
+			val_830 = false; env.hookJP = nil
+		end
+	end
+})
+moveGeneral:AddToggle({
+	text = "Minijump", flag = "Minijump"
+}):AddBind({
+	key = "none", mode = "hold",
+	callback = function(bool)
+		if not bool and library_flags["Minijump"] then
+			local lastTime = env.lastMinijumpTime or 0
+			if tick() - lastTime > 0.15 then
+				env.lastMinijumpTime = tick(); env.minijumpActive = true; env.mjArmedTime = tick()
+			end
+		end
+	end
+})
+moveGeneral:AddToggle({
+	text = "Fireman", flag = "Fireman"
+}):AddBind({
+	key = "none", mode = "hold",
+	callback = function(bool)
+		env.fmActiveHold = bool
+	end
+})
+moveGeneral:AddToggle({
+	text = "Ladder Bug", flag = "Ladder Bug"
+}):AddBind({
+	key = "none", mode = "hold", flag = "Ladder Bug Bind",
+	callback = function(bool)
+		env.lbBindHeld = not bool
+	end
+})
+moveGeneral:AddToggle({
+	text = "Pixelsurf"
+}):AddBind({
+	key = "none", mode = "hold",
+	callback = function(var_44)
+		env.surfingBindHeld = not var_44
+	end
+})
+moveGeneral:AddToggle({
+	text = "Airstuck",
+	callback = function()
+		if val_733.Character then
+			local hrp = val_733.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then hrp.Anchored = false end
+		end
+	end
+}):AddBind({
+	key = "none", mode = "hold",
+	callback = function(bool)
+		if library_flags["Airstuck"] then
+			local char = val_733.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart"); local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
+			if char and hrp then
+				hrp.Anchored = not bool
+				if not bool then
+					hrp.AssemblyLinearVelocity = Vector3.new()
+					if torso then torso.AssemblyLinearVelocity = Vector3.new() end
+				end
+			end
+		end
+	end
+})
+moveStrafe:AddToggle({ text = "Auto Strafe" }); last = Vector3.new()
+moveStrafe:AddToggle({ text = "Maintain Velocity" })
+moveUtility:AddToggle({ text = "No Crouch Cooldown" })
+moveUtility:AddToggle({ text = "ladder owner", flag = "ladder owner" })
+moveUtility:AddSlider({ text = "Jetpack Speed", flag = "jetpackSpeed", min = 10, max = 100, value = 35 })
+moveUtility:AddSlider({ text = "Minijump Mult", min = 0.3, max = 0.8, float = 0.1, flag = "mjMult", value = 0.5 })
+moveUtility:AddSlider({ text = "Pixel Surf Speed", min = 18, max = 200, value = 25, flag = "pspeed" })
+moveUtility:AddList({ text = "Pixel Surf Mode", flag = "Pixel Surf Mode", values = {"All Walls", "Seams"}, value = "All Walls" })
+moveUtility:AddSlider({ text = "Long Jump Studs", min = 1, max = 10, value = 1, suffix = "st", flag = "longJumpStuds" })
+moveUtility:AddToggle({ text = "Auto Align", flag = "Auto Align" })
+moveUtility:AddList({ text = "Edgebug Mode", flag = "Edgebug Mode", values = {"mimic", "redirectional", "helltracing"}, value = "redirectional" })
+moveUtility:AddToggle({ text = "Edgebug Visualizer", flag = "showEBVis" })
+moveUtility:AddToggle({ text = "Edgebug Logs", flag = "showEBLogs" })
+moveUtility:AddToggle({ text = "Edgebug Badge", flag = "Edgebug Badge" })
+blindParts = { "FakeHead", "Gun", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm" }
+val_412 = val_749.ViewportSize.Y - 50; val_436 = Drawing.new("Text"); val_436.Center = true; val_436.Outline = true; val_436.Color = Color3.new(1, 1, 1); val_436.Font = 3; val_436.Size = 20; val_436.Visible = false; oldWalk = val_757.walkupdate; oldSpeedUpdate = val_757.speedupdate
 
 CreateThread(function()
 	local speedHistory = {}
+	local staminaHistory = {}
+	local fpsHistory = {}
+	local strafeHistory = {}
 	local maxHistory = 80
-	local graphLines = {}
-	for i = 1, maxHistory - 1 do
-		local l = Drawing.new("Line"); l.Thickness = 2; l.Visible = false; l.ZIndex = 1
-		graphLines[i] = l
+	local function makeGraphLines()
+		local lines = {}
+		for i = 1, maxHistory - 1 do
+			local l = Drawing.new("Line")
+			l.Thickness = 2
+			l.Visible = false
+			l.ZIndex = 1
+			lines[i] = l
+		end
+		return lines
+	end
+	local graphLines = makeGraphLines()
+	local staminaLines = makeGraphLines()
+	local fpsLines = makeGraphLines()
+	local strafeLines = makeGraphLines()
+	local function hideGraphLines(lines)
+		for i = 1, #lines do
+			lines[i].Visible = false
+		end
+	end
+	local function drawGraph(history, lines, graphY, centerX, maxVal, graphColor, diffColors)
+		local baseX = centerX - (maxHistory * 2) / 2
+		for i = 1, maxHistory - 1 do
+			local line = lines[i]
+			local v1, v2 = history[i], history[i + 1]
+			if v1 and v2 then
+				line.Visible = true
+				line.Transparency = 1
+				if diffColors then
+					local diff = v2 - v1
+					if diff > 1 then
+						line.Color = Color3.new(0, 1, 0)
+					elseif diff < -1 then
+						line.Color = Color3.new(1, 0, 0)
+					else
+						line.Color = graphColor
+					end
+				else
+					line.Color = graphColor
+				end
+				local h1 = math.clamp(v1 / maxVal, 0, 1) * 35
+				local h2 = math.clamp(v2 / maxVal, 0, 1) * 35
+				line.From = Vector2.new(baseX + (i * 2), graphY - h1)
+				line.To = Vector2.new(baseX + ((i + 1) * 2), graphY - h2)
+			else
+				line.Visible = false
+			end
+		end
+	end
+	local function pushHistory(history, value)
+		table.insert(history, value)
+		if #history > maxHistory then
+			table.remove(history, 1)
+		end
 	end
 	local vTrans = 0
+	local lastFpsTick = tick()
 
 	while true do
 		env.runService.RenderStepped:Wait()
@@ -3990,74 +4808,89 @@ CreateThread(function()
 				L_mjText.Font = indFont; L_mjText.Size = indSize
 		L_fmText.Font = indFont; L_fmText.Size = indSize; L_jpText.Font = indFont; L_jpText.Size = indSize; L_wcText.Font = indFont; L_wcText.Size = indSize; L_lbText.Font = indFont; L_lbText.Size = indSize
 		if not val_749 or not val_749.ViewportSize then continue end
+		local drawOk = library_flags["Drawing Enabled"] ~= false
 		local centerX = val_749.ViewportSize.X / 2; local baseY = val_749.ViewportSize.Y - 100; local lerpSpeed = 0.15
 		if not env.indTrans then
 			env.indTrans = { ps = 0, lj = 0, eb = 0, jb = 0, as = 0, mj = 0, fm = 0, jp = 0 }
 		end
-		local trans = env.indTrans; local psActive = library_flags["showPSInd"] and (env.pixelSurfTouching or env.surfing); local psTarget = psActive and 1 or 0; trans.ps = trans.ps + (psTarget - trans.ps) * lerpSpeed
+		local trans = env.indTrans; 		local psActive = drawOk and library_flags["showPSInd"] and (env.pixelSurfTouching or env.surfing); local psTarget = psActive and 1 or 0; trans.ps = trans.ps + (psTarget - trans.ps) * lerpSpeed
 		if math.abs(trans.ps - psTarget) < 0.001 then trans.ps = psTarget end
-		L_psText.Transparency = trans.ps; L_psText.Visible = trans.ps > 0; local ljActive = library_flags["showLJInd"] and env.longJumpHold; local ljTarget = ljActive and 1 or 0; trans.lj = trans.lj + (ljTarget - trans.lj) * lerpSpeed
+		L_psText.Transparency = trans.ps; L_psText.Visible = trans.ps > 0; local ljActive = drawOk and library_flags["showLJInd"] and env.longJumpHold; local ljTarget = ljActive and 1 or 0; trans.lj = trans.lj + (ljTarget - trans.lj) * lerpSpeed
 		if math.abs(trans.lj - ljTarget) < 0.001 then trans.lj = ljTarget end
-		L_ljText.Transparency = trans.lj; L_ljText.Visible = trans.lj > 0; local ebActive = library_flags["showEBInd"] and library_flags["Edgebug"] and (val_830 or library_flags["Auto Edge Bug"]); local ebTarget = ebActive and 1 or 0; trans.eb = trans.eb + (ebTarget - trans.eb) * lerpSpeed
+		L_ljText.Transparency = trans.lj; L_ljText.Visible = trans.lj > 0; local ebActive = drawOk and library_flags["showEBInd"] and library_flags["Edgebug"] and (val_830 or library_flags["Auto Edge Bug"]); local ebTarget = ebActive and 1 or 0; trans.eb = trans.eb + (ebTarget - trans.eb) * lerpSpeed
 		if math.abs(trans.eb - ebTarget) < 0.001 then trans.eb = ebTarget end
-		L_ebText.Transparency = trans.eb; L_ebText.Visible = trans.eb > 0; local jbActive = library_flags["showJBInd"] and (env.jbBindHeld or (tick() - (env.lastJumpbugTime or 0) < 0.4)); local jbTarget = jbActive and 1 or 0; trans.jb = trans.jb + (jbTarget - trans.jb) * lerpSpeed
+		L_ebText.Transparency = trans.eb; L_ebText.Visible = trans.eb > 0; local jbActive = drawOk and library_flags["showJBInd"] and (env.jbBindHeld or (tick() - (env.lastJumpbugTime or 0) < 0.4)); local jbTarget = jbActive and 1 or 0; trans.jb = trans.jb + (jbTarget - trans.jb) * lerpSpeed
 		if math.abs(trans.jb - jbTarget) < 0.001 then trans.jb = jbTarget end
-		L_jbText.Transparency = trans.jb; L_jbText.Visible = trans.jb > 0; L_jbText.Color = (tick() - (env.lastJumpbugTime or 0) <= 0.5) and Color3.new(0, 1, 0.5) or Color3.new(1, 1, 1); local asAnchored = val_872.alive and val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart") and val_733.Character.HumanoidRootPart.Anchored; local asActive = library_flags["showASInd"] and asAnchored; local asTarget = asActive and 1 or 0; trans.as = trans.as + (asTarget - trans.as) * lerpSpeed; local tbActive = library_flags["showTBInd"] and env.tbSurfing and library_flags["Texturebug"]; local tbTarget = tbActive and 1 or 0; trans.tb = (trans.tb or 0) + (tbTarget - (trans.tb or 0)) * lerpSpeed
+		L_jbText.Transparency = trans.jb; L_jbText.Visible = trans.jb > 0; L_jbText.Color = (tick() - (env.lastJumpbugTime or 0) <= 0.5) and Color3.new(0, 1, 0.5) or Color3.new(1, 1, 1); local asAnchored = val_872.alive and val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart") and val_733.Character.HumanoidRootPart.Anchored; local asActive = drawOk and library_flags["showASInd"] and asAnchored; local asTarget = asActive and 1 or 0; trans.as = trans.as + (asTarget - trans.as) * lerpSpeed; local tbActive = drawOk and library_flags["showTBInd"] and env.tbSurfing and library_flags["Texturebug"]; local tbTarget = tbActive and 1 or 0; trans.tb = (trans.tb or 0) + (tbTarget - (trans.tb or 0)) * lerpSpeed
 		if math.abs(trans.as - asTarget) < 0.001 then trans.as = asTarget end
 		L_asText.Transparency = trans.as; L_tbText.Transparency = trans.tb or 0
 					L_tbText.Transparency = trans.tb or 0
 		L_asText.Visible = trans.as > 0; L_tbText.Visible = (trans.tb or 0) > 0
-				local mjActive = library_flags["showMJInd"] and (env.minijumpActive or (tick() - (env.minijumpSuccessTime or 0) < 0.3))
+				local mjActive = drawOk and library_flags["showMJInd"] and (env.minijumpActive or (tick() - (env.minijumpSuccessTime or 0) < 0.3))
 		local mjTarget = mjActive and 1 or 0; trans.mj = trans.mj + (mjTarget - trans.mj) * lerpSpeed
 		if math.abs(trans.mj - mjTarget) < 0.001 then trans.mj = mjTarget end
-		L_mjText.Transparency = trans.mj; L_mjText.Visible = trans.mj > 0; local fmActiveStatus = library_flags["showFMInd"] and library_flags["Fireman"] and (env.fmOnLadder or env.fmTriggered or (val_671 and val_671:IsKeyDown(Enum.KeyCode.S))); local fmTarget = fmActiveStatus and 1 or 0; trans.fm = trans.fm + (fmTarget - trans.fm) * lerpSpeed
+		L_mjText.Transparency = trans.mj; L_mjText.Visible = trans.mj > 0; local fmActiveStatus = drawOk and library_flags["showFMInd"] and library_flags["Fireman"] and (env.fmOnLadder or env.fmTriggered or (val_671 and val_671:IsKeyDown(Enum.KeyCode.S))); local fmTarget = fmActiveStatus and 1 or 0; trans.fm = trans.fm + (fmTarget - trans.fm) * lerpSpeed
 		if math.abs(trans.fm - fmTarget) < 0.001 then trans.fm = fmTarget end
-		L_fmText.Transparency = trans.fm; L_fmText.Visible = trans.fm > 0; local jpActive = library_flags["showJPInd"] and library_flags["Jetpack"] and env.jetpackBindHeld; local jpTarget = jpActive and 1 or 0; trans.jp = (trans.jp or 0) + (jpTarget - (trans.jp or 0)) * lerpSpeed
+		L_fmText.Transparency = trans.fm; L_fmText.Visible = trans.fm > 0; local jpActive = drawOk and library_flags["showJPInd"] and library_flags["Jetpack"] and env.jetpackBindHeld; local jpTarget = jpActive and 1 or 0; trans.jp = (trans.jp or 0) + (jpTarget - (trans.jp or 0)) * lerpSpeed
 		if math.abs((trans.jp or 0) - jpTarget) < 0.001 then trans.jp = jpTarget end
-		L_jpText.Transparency = trans.jp; L_jpText.Visible = trans.jp > 0; local wcActive = library_flags["showWCInd"] and (library_flags["Wallclimb"] or library_flags["Like Gecko"]) and (env.wallclimbing or env.wcBindHeld); local wcTarget = wcActive and 1 or 0; trans.wc = (trans.wc or 0) + (wcTarget - (trans.wc or 0)) * lerpSpeed
+		L_jpText.Transparency = trans.jp; L_jpText.Visible = trans.jp > 0; local wcActive = drawOk and library_flags["showWCInd"] and (library_flags["Wallclimb"] or library_flags["Like Gecko"]) and (env.wallclimbing or env.wcBindHeld); local wcTarget = wcActive and 1 or 0; trans.wc = (trans.wc or 0) + (wcTarget - (trans.wc or 0)) * lerpSpeed
 		if math.abs((trans.wc or 0) - wcTarget) < 0.001 then trans.wc = wcTarget end
-		L_wcText.Transparency = trans.wc; L_wcText.Visible = trans.wc > 0; local lbActive = library_flags["showLBInd"] and library_flags["Ladder Bug"] and (env.ladderBugActive or env.lbBindHeld or tick() - (env.lastLadderBugTime or 0) < 0.5); local lbTarget = lbActive and 1 or 0; trans.lb = (trans.lb or 0) + (lbTarget - (trans.lb or 0)) * lerpSpeed
+		L_wcText.Transparency = trans.wc; L_wcText.Visible = trans.wc > 0; local lbActive = drawOk and library_flags["showLBInd"] and library_flags["Ladder Bug"] and (env.ladderBugActive or env.lbBindHeld or tick() - (env.lastLadderBugTime or 0) < 0.5); local lbTarget = lbActive and 1 or 0; trans.lb = (trans.lb or 0) + (lbTarget - (trans.lb or 0)) * lerpSpeed
 		if math.abs((trans.lb or 0) - lbTarget) < 0.001 then trans.lb = lbTarget end
-		L_lbText.Transparency = trans.lb; L_lbText.Visible = trans.lb > 0; local slot = 0; local spacing = 20
+		L_lbText.Transparency = trans.lb; L_lbText.Visible = trans.lb > 0; 		local slot = 0; local spacing = 20
 		
-		local vTarget = library_flags["Velocity Indicator"] and 1 or 0
+		local vTarget = drawOk and library_flags["Velocity Indicator"] and 1 or 0
 		vTrans = vTrans + (vTarget - vTrans) * lerpSpeed
 		if math.abs(vTrans - vTarget) < 0.001 then vTrans = vTarget end
 		
 		val_436.Transparency = vTrans; val_436.Visible = vTrans > 0
+		local showVelGraph = drawOk and library_flags["Velocity Graph"]
+		local hrp = val_872.alive and val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart")
+		local speed = 0
+		if hrp then speed = math.floor((hrp.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude * 15) end
 		if val_436.Visible then
 			val_436.Position = Vector2.new(centerX, baseY + slot * spacing)
-			local speed = 0
-			local hrp = val_872.alive and val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart")
-			if hrp then speed = math.floor((hrp.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude * 15) end
 			val_436.Text = tostring(speed)
-			
-			table.insert(speedHistory, speed)
-			if #speedHistory > maxHistory then table.remove(speedHistory, 1) end
-			
-			local baseX = centerX - (maxHistory * 2) / 2
-			local graphY = baseY + slot * spacing + 45
-			
-			for i = 1, maxHistory - 1 do
-				local line = graphLines[i]
-				if speedHistory[i] and speedHistory[i+1] then
-					line.Visible = true; line.Transparency = vTrans
-					local diff = speedHistory[i+1] - speedHistory[i]
-					if diff > 1 then line.Color = Color3.new(0, 1, 0)
-					elseif diff < -1 then line.Color = Color3.new(1, 0, 0)
-					else line.Color = Color3.new(1, 1, 1) end
-					
-					local h1 = math.clamp(speedHistory[i] / 400, 0, 1) * 35
-					local h2 = math.clamp(speedHistory[i+1] / 400, 0, 1) * 35
-					line.From = Vector2.new(baseX + (i * 2), graphY - h1)
-					line.To = Vector2.new(baseX + ((i+1) * 2), graphY - h2)
-				else
-					line.Visible = false
-				end
-			end
-			if vTrans > 0.5 then slot = slot + 3 end
+			if vTrans > 0.5 then slot = slot + 1 end
+		end
+		if showVelGraph or val_436.Visible then
+			pushHistory(speedHistory, speed)
+		end
+		local graphSlot = slot
+		if showVelGraph then
+			drawGraph(speedHistory, graphLines, baseY + graphSlot * spacing + 25, centerX, 400, library_flags["velocityGraphColor"] or Color3.new(1, 1, 1), true)
+			graphSlot = graphSlot + 3
 		else
-			for i = 1, maxHistory - 1 do graphLines[i].Visible = false end
+			hideGraphLines(graphLines)
+		end
+		local showStaminaGraph = drawOk and library_flags["Stamina Graph"]
+		local staminaVal = env.MovementController and env.MovementController.Stamina
+		if showStaminaGraph and staminaVal then
+			pushHistory(staminaHistory, math.floor(staminaVal))
+			drawGraph(staminaHistory, staminaLines, baseY + graphSlot * spacing + 25, centerX, 100, library_flags["staminaGraphColor"] or Color3.fromRGB(200, 160, 255), false)
+			graphSlot = graphSlot + 3
+		else
+			hideGraphLines(staminaLines)
+		end
+		local showStrafeGraph = drawOk and library_flags["Strafe Graph"]
+		if showStrafeGraph then
+			local mouseDelta = val_671:GetMouseDelta()
+			pushHistory(strafeHistory, math.abs(mouseDelta.X))
+			drawGraph(strafeHistory, strafeLines, baseY + graphSlot * spacing + 25, centerX, 25, Color3.fromRGB(255, 200, 120), false)
+			graphSlot = graphSlot + 3
+		else
+			hideGraphLines(strafeLines)
+		end
+		local showFpsGraph = drawOk and library_flags["FPS Graph"]
+		if showFpsGraph then
+			local now = tick()
+			local dt = now - lastFpsTick
+			lastFpsTick = now
+			local fps = dt > 0 and math.clamp(math.floor(1 / dt), 0, 300) or 0
+			pushHistory(fpsHistory, fps)
+			drawGraph(fpsHistory, fpsLines, baseY + graphSlot * spacing + 25, centerX, 144, library_flags["fpsGraphColor"] or Color3.fromRGB(120, 255, 120), false)
+		else
+			hideGraphLines(fpsLines)
 		end
 		if L_jpText.Visible then
 			L_jpText.Position = Vector2.new(centerX, baseY + slot * spacing); local hrp = val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart"); local isFlying = hrp and (val_733.Character and val_733.Character:FindFirstChild("Humanoid") and (val_733.Character.Humanoid:GetState() == Enum.HumanoidStateType.Freefall or val_733.Character.Humanoid.FloorMaterial == Enum.Material.Air)); L_jpText.Color = isFlying and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
@@ -4103,6 +4936,7 @@ CreateThread(function()
 			L_lbText.Position = Vector2.new(centerX, baseY + slot * spacing); L_lbText.Color = (env.ladderBugActive or tick() - (env.lastLadderBugTime or 0) < 0.5) and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
 			if (trans.lb or 0) > 0.5 then slot = slot + 1 end
 		end
+		if env.updateScreenHud then env.updateScreenHud() end
 	end
 end)
 strafedir = Vector3.new(); cachedMovementIcon = nil
@@ -4141,19 +4975,6 @@ env.showEdgebugBadge = function()
 		end)
 	end)
 end
-movementFeatures:AddToggle({
-	text = "Edgebug"
-}):AddBind({
-	key = "none", mode = "hold",
-	callback = function(bool)
-		env.ebHolding = not bool
-		if not bool then
-			val_830 = true
-		else
-			val_830 = false; env.hookJP = nil
-		end
-	end
-})
 val_442 = { CFrame.new(1, 0, 0), CFrame.new(-1, 0, 0), CFrame.new(0, 0, 1), CFrame.new(0, 0, -1), CFrame.new(0.7, 0, 0.7), CFrame.new(-0.7, 0, 0.7), CFrame.new(0.7, 0, -0.7), CFrame.new(-0.7, 0, -0.7), CFrame.new(1, -0.6, 0), CFrame.new(-1, -0.6, 0), CFrame.new(0, -0.6, 1), CFrame.new(0, -0.6, -1), CFrame.new(0.7, -0.6, 0.7), CFrame.new(-0.7, -0.6, 0.7), CFrame.new(0.7, -0.6, -0.7), CFrame.new(-0.7, -0.6, -0.7) }
 val_447 = Instance.new("BodyVelocity"); lastWallNormal = nil
 function findWallHit()
@@ -4182,11 +5003,130 @@ function findWallHit()
 	end
 	return closestPart, closestNormal, closestPos
 end
+local function getPixelSurfIgnoreList()
+	local Map = workspace:FindFirstChild("Map")
+	return { val_749, val_733.Character, workspace.Ray_Ignore, Map and Map:FindFirstChild("SpawnPoints") }
+end
+local function isNearPartSeam(part, hitPos, hitNormal, tolerance)
+	if not part or not part:IsA("BasePart") or not hitPos or not hitNormal then return false end
+	tolerance = tolerance or 1.05
+	local cf = part.CFrame
+	local half = part.Size * 0.5
+	local localPos = cf:PointToObjectSpace(hitPos)
+	local localNormal = cf:VectorToObjectSpace(hitNormal)
+	local absN = Vector3.new(math.abs(localNormal.X), math.abs(localNormal.Y), math.abs(localNormal.Z))
+	local edgeDist
+	if absN.X >= absN.Y and absN.X >= absN.Z then
+		edgeDist = math.min(half.Y - math.abs(localPos.Y), half.Z - math.abs(localPos.Z))
+	elseif absN.Y >= absN.X and absN.Y >= absN.Z then
+		edgeDist = math.min(half.X - math.abs(localPos.X), half.Z - math.abs(localPos.Z))
+	else
+		edgeDist = math.min(half.X - math.abs(localPos.X), half.Y - math.abs(localPos.Y))
+	end
+	if edgeDist <= tolerance then return true end
+	if math.abs(hitNormal.Y) < 0.35 then
+		local distToBottom = localPos.Y + half.Y
+		local distToTop = half.Y - localPos.Y
+		if distToBottom <= tolerance or distToTop <= tolerance then return true end
+	end
+	return false
+end
+local function hasGeometrySeam(hitPart, hitPos, hitNormal, ignoreList)
+	if not hitPart or not hitPos or not hitNormal then return false end
+	local tangent = hitNormal:Cross(Vector3.new(0, 1, 0))
+	if tangent.Magnitude < 0.05 then
+		tangent = hitNormal:Cross(Vector3.new(1, 0, 0))
+	end
+	if tangent.Magnitude < 0.05 then return false end
+	tangent = tangent.Unit
+	local bitangent = hitNormal:Cross(tangent).Unit
+	local probes = {
+		tangent * 0.75, -tangent * 0.75, bitangent * 0.75, -bitangent * 0.75,
+		Vector3.new(0, 0.75, 0), Vector3.new(0, -0.75, 0),
+	}
+	for _, off in probes do
+		local origin = hitPos + hitNormal * 0.25 + off
+		local ray = Ray.new(origin, -hitNormal * 2.5)
+		local part, _, normal = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+		if not part or part ~= hitPart then
+			return true
+		end
+		if normal and math.abs(normal:Dot(hitNormal)) < 0.82 then
+			return true
+		end
+	end
+	local sideOrigin = hitPos + hitNormal * 0.2
+	local sideRay = Ray.new(sideOrigin, Vector3.new(0, -2.8, 0))
+	local floorPart, floorPos, floorNormal = workspace:FindPartOnRayWithIgnoreList(sideRay, ignoreList)
+	if floorPart and floorNormal and floorNormal.Y > 0.55 and floorPart ~= hitPart then
+		if math.abs(hitPos.Y - floorPos.Y) <= 1.35 then
+			return true
+		end
+	end
+	return false
+end
+function env.isPixelSurfSeam(wallPart, wallPos, wallNormal)
+	if not wallPart or not wallPos or not wallNormal then return false end
+	local mode = library_flags["Pixel Surf Mode"] or "All Walls"
+	if mode ~= "Seams" then return true end
+	if isNearPartSeam(wallPart, wallPos, wallNormal, 1.1) then return true end
+	if hasGeometrySeam(wallPart, wallPos, wallNormal, getPixelSurfIgnoreList()) then return true end
+	return false
+end
+function findWallHitForSurf()
+	local part, normal, pos = findWallHit()
+	if part and normal and pos and env.isPixelSurfSeam(part, pos, normal) then
+		return part, normal, pos
+	end
+	return nil, nil, nil
+end
+local function getPixelSurfGlideDir(hum, hrp, wallNormal)
+	local pspeed = library_flags["pspeed"] or 18
+	local horizNormal = Vector3.new(wallNormal.X, 0, wallNormal.Z)
+	if horizNormal.Magnitude < 0.05 then return Vector3.zero end
+	horizNormal = horizNormal.Unit
+	local vel = hrp.AssemblyLinearVelocity
+	local horizVel = Vector3.new(vel.X, 0, vel.Z)
+	local glideDir = Vector3.zero
+	local moveDir = hum and hum.MoveDirection or Vector3.zero
+	if moveDir.Magnitude > 0.1 then
+		local horizMove = Vector3.new(moveDir.X, 0, moveDir.Z).Unit
+		local projected = horizMove - horizNormal * horizMove:Dot(horizNormal)
+		if projected.Magnitude > 0.01 then
+			glideDir = projected.Unit
+		end
+	elseif horizVel.Magnitude > 1 then
+		local projected = horizVel.Unit - horizNormal * horizVel.Unit:Dot(horizNormal)
+		if projected.Magnitude > 0.01 then
+			glideDir = projected.Unit
+		end
+	end
+	if glideDir.Magnitude < 0.01 and val_749 then
+		local look = val_749.CFrame.LookVector
+		local horizLook = Vector3.new(look.X, 0, look.Z)
+		if horizLook.Magnitude > 0.1 then
+			local projected = horizLook.Unit - horizNormal * horizLook.Unit:Dot(horizNormal)
+			if projected.Magnitude > 0.01 then
+				glideDir = projected.Unit
+			end
+		end
+	end
+	if glideDir.Magnitude < 0.01 then
+		glideDir = horizNormal:Cross(Vector3.new(0, 1, 0))
+		if glideDir.Magnitude < 0.01 then
+			glideDir = horizNormal:Cross(Vector3.new(1, 0, 0))
+		end
+		if glideDir.Magnitude > 0.01 then
+			glideDir = glideDir.Unit
+		end
+	end
+	return Vector3.new(glideDir.X * pspeed, 0, glideDir.Z * pspeed)
+end
 function isTouchingWall()
 	local part = findWallHit()
 	return part ~= nil
 end 
-movementFeatures:AddToggle({
+moveGeneral:AddToggle({
 	text = "Jetpack"
 }):AddBind({
 	key = "none", mode = "hold",
@@ -4194,15 +5134,7 @@ movementFeatures:AddToggle({
 		env.jetpackBindHeld = not var_44
 	end
 })
-movementFeatures:AddToggle({
-	text = "Pixelsurf"
-}):AddBind({
-	key = "none", mode = "hold",
-	callback = function(var_44)
-		env.surfingBindHeld = not var_44
-	end
-})
-movementFeatures:AddToggle({
+moveGeneral:AddToggle({
 	text = "Long Jump"
 }):AddBind({
 	key = "none", mode = "hold",
@@ -4229,37 +5161,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
 		env.longJumpHold = false
 	end
 end)
-movementFeatures:AddToggle({
-	text = "Jumpbug",
-}):AddBind({
-	key = "none", mode = "hold",
-	callback = function(bool)
-		env.jbBindHeld = bool
-	end
-})
-movementFeatures:AddToggle({
-	text = "Minijump", flag = "Minijump"
-}):AddBind({
-	key = "none", mode = "hold",
-	callback = function(bool)
-		if not bool and library_flags["Minijump"] then
-			local lastTime = env.lastMinijumpTime or 0
-			if tick() - lastTime > 0.15 then
-				env.lastMinijumpTime = tick(); env.minijumpActive = true; env.mjArmedTime = tick()
-			end
-		end
-	end
-})
-movementFeatures:AddToggle({
-	text = "Fireman", flag = "Fireman"
-}):AddBind({
-	key = "none", mode = "hold",
-	callback = function(bool)
-		env.fmActiveHold = bool
-	end
-})
-
-movementFeatures:AddToggle({
+moveGeneral:AddToggle({
 	text = "Head Boost", flag = "Head Boost"
 }):AddBind({
 	key = "none", mode = "hold",
@@ -4269,7 +5171,7 @@ movementFeatures:AddToggle({
 		end
 	end
 })
-movementFeatures:AddToggle({
+moveGeneral:AddToggle({
 	text = "Noclip"
 }):AddBind({
 	key = "none", mode = "hold",
@@ -4280,30 +5182,7 @@ movementFeatures:AddToggle({
 		noclipping = not var_20
 	end
 })
-movementFeatures:AddToggle({
-	text = "Airstuck",
-	callback = function()
-		if val_733.Character then
-			local hrp = val_733.Character:FindFirstChild("HumanoidRootPart")
-			if hrp then hrp.Anchored = false end
-		end
-	end
-}):AddBind({
-	key = "none", mode = "hold",
-	callback = function(bool)
-		if library_flags["Airstuck"] then
-			local char = val_733.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart"); local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
-			if char and hrp then
-				hrp.Anchored = not bool
-				if not bool then
-					hrp.AssemblyLinearVelocity = Vector3.new()
-					if torso then torso.AssemblyLinearVelocity = Vector3.new() end
-				end
-			end
-		end
-	end
-})
-movementFeatures:AddToggle({
+moveGeneral:AddToggle({
 	text = "Texturebug",
 	callback = function()
 		env.tbActive = false
@@ -4324,8 +5203,10 @@ movementFeatures:AddToggle({
 					spawn(function()
 						while env.tbActive and char.Parent do
 							local pos = hrp.Position; local head = char:FindFirstChild("Head"); local headPos = head and head.Position or pos; local params = RaycastParams.new()
-							params.FilterDescendantsInstances = {char, workspace.CurrentCamera}
-							params.FilterType = Enum.RaycastFilterType.Exclude; local dirs = {hrp.CFrame.LookVector, -hrp.CFrame.LookVector, hrp.CFrame.RightVector, -hrp.CFrame.RightVector}; local bodyNearWall = false; local headNearWall = false
+							params.FilterDescendantsInstances = { char, workspace.CurrentCamera }
+							params.FilterType = Enum.RaycastFilterType.Exclude
+							local dirs = { hrp.CFrame.LookVector, -hrp.CFrame.LookVector, hrp.CFrame.RightVector, -hrp.CFrame.RightVector }
+							local bodyNearWall, headNearWall = false, false
 							for _, dir in dirs do
 								if workspace:Raycast(pos, dir * 4.5, params) then bodyNearWall = true end
 								if head and workspace:Raycast(headPos, dir * 4.5, params) then headNearWall = true end
@@ -4334,7 +5215,9 @@ movementFeatures:AddToggle({
 							if nearWall then
 								if surfStartTime == 0 then surfStartTime = tick() end
 								if tick() - surfStartTime > 2 then
-									local vel = hrp.AssemblyLinearVelocity; hrp.AssemblyLinearVelocity = Vector3.new(vel.X * 0.5, vel.Y, vel.Z * 0.5); env.tbActive = false
+									local vel = hrp.AssemblyLinearVelocity
+									hrp.AssemblyLinearVelocity = Vector3.new(vel.X * 0.5, vel.Y, vel.Z * 0.5)
+									env.tbActive = false
 									env.tbCooldown = true
 									break
 								end
@@ -4369,7 +5252,7 @@ movementFeatures:AddToggle({
 		end
 	end
 })
-movementFeatures:AddToggle({
+moveGeneral:AddToggle({
 	text = "Wallclimb", flag = "Wallclimb"
 }):AddBind({
 	key = "none", mode = "hold", flag = "Wallclimb Bind",
@@ -4377,15 +5260,7 @@ movementFeatures:AddToggle({
 		env.wcBindHeld = not bool
 	end
 })
-movementFeatures:AddToggle({
-	text = "Ladder Bug", flag = "Ladder Bug"
-}):AddBind({
-	key = "none", mode = "hold", flag = "Ladder Bug Bind",
-	callback = function(bool)
-		env.lbBindHeld = not bool
-	end
-})
-movementFeatures:AddToggle({
+moveGeneral:AddToggle({
 	text = "Edge Jump", flag = "Edge Jump"
 }):AddBind({
 	key = "none", mode = "hold", flag = "Edge Jump Bind",
@@ -4393,7 +5268,7 @@ movementFeatures:AddToggle({
 		env.ejBindHeld = not bool
 	end
 })
-movementFeatures:AddToggle({
+moveGeneral:AddToggle({
 	text = "Blockbot", flag = "Blockbot"
 }):AddBind({
 	key = "none", mode = "hold", flag = "Blockbot Bind",
@@ -4401,7 +5276,7 @@ movementFeatures:AddToggle({
 		env.blockbotBindHeld = not bool
 	end
 })
-movementFeatures:AddToggle({
+moveUtility:AddToggle({
 	text = "Auto Duck", flag = "Auto Duck"
 }):AddBind({
 	key = "none", mode = "hold", flag = "Auto Duck Bind",
@@ -4570,7 +5445,11 @@ do
 			end
 			if not ebEdgePos then
 				local rp = RaycastParams.new()
-				rp.FilterDescendantsInstances = {char, lockPart}
+				rp.FilterDescendantsInstances = { char, lockPart, edgePlat }
+				local rayIgnore = workspace:FindFirstChild("Ray_Ignore")
+				local debris = workspace:FindFirstChild("Debris")
+				if rayIgnore then rp.FilterDescendantsInstances[#rp.FilterDescendantsInstances + 1] = rayIgnore end
+				if debris then rp.FilterDescendantsInstances[#rp.FilterDescendantsInstances + 1] = debris end
 				rp.FilterType = Enum.RaycastFilterType.Exclude; local startPos = hrp.Position; local bestEdgePoint = nil; local bestEdgeDir = nil; local bestScore = math.huge; local allDirs = {}; local flatVel = Vector3.new(vel.X, 0, vel.Z); local camLook = workspace.CurrentCamera.CFrame.LookVector; local flatCam = Vector3.new(camLook.X, 0, camLook.Z); local hasCam = flatCam.Magnitude > 0.1; local hasVel = flatVel.Magnitude > 1; local velDir = hasVel and flatVel.Unit or nil; local camDir = hasCam and flatCam.Unit or nil; local moveDir
 				if velDir and camDir then
 					local blend = (velDir * 0.6 + camDir * 0.4)
@@ -4777,7 +5656,7 @@ do
 		end
 	end)
 end
-miscExtra = generalCol1:AddSection("Extra"); miscExtra:AddToggle({ text = "Remove Radio Commands" }); miscExtra:AddToggle({ text = "Remove UI Elements", callback = removeUIElementsCallback }); miscExtra:AddToggle({ text = "Remove Sleeves", callback = updateViewModelVisuals }); miscGeneralFeatures = generalCol2:AddSection("More Features"); miscGeneralFeatures:AddToggle({ text = "Old Gun Sounds" })
+miscExtra = generalCol1:AddSection("Extra"); miscExtra:AddToggle({ text = "Remove Radio Commands" }); miscExtra:AddToggle({ text = "Remove UI Elements", callback = removeUIElementsCallback }); miscExtra:AddToggle({ text = "Detect Moderators (Auto-Leave)", flag = "modDetect" }); miscExtra:AddToggle({ text = "Remove Sleeves", callback = updateViewModelVisuals }); miscGeneralFeatures = generalCol2:AddSection("More Features"); miscGeneralFeatures:AddToggle({ text = "Old Gun Sounds" })
 miscGeneralFeatures:AddToggle({
 	text = "Hitsound"
 }):AddList({
@@ -5655,7 +6534,7 @@ end)()
 					j:Destroy()
 				end
 			end
-			sleeve.Parent = arm; local motor = Instance.new("Motor6D"); motor.Name = "SleeveMotor"; motor.Part0 = arm; motor.Part1 = sleeve; motor.C0 = offset or CFrame.new(); motor.C1 = CFrame.new(); motor.Parent = sleeve; sleeve:SetAttribute("Applied", selected)
+			sleeve.Parent = arm; local motor = Instance.new("Motor6D"); motor.Name = "SleeveMotor"; motor.Part0 = arm; motor.Part1 = sleeve; motor.C0 = offset or CFrame.new(); motor.C1 = CFrame.new(); motor:SetAttribute("OrigC0", motor.C0); motor:SetAttribute("OrigC1", motor.C1); motor.Parent = sleeve; sleeve:SetAttribute("Applied", selected)
 		end
 		if selected == "Default" then
 			local rOff = originals:FindFirstChild("RO"); local lOff = originals:FindFirstChild("LO"); attachSleeve(originals:FindFirstChild("R"), rArm, rOff and rOff.Value or nil); attachSleeve(originals:FindFirstChild("L"), lArm, lOff and lOff.Value or nil); return
@@ -5665,33 +6544,45 @@ end)()
 		if not template then return end
 		attachSleeve(template.R, rArm, template.RO); attachSleeve(template.L, lArm, template.LO)
 	end
+	local function applySleevePositionOffset(motor)
+		if not motor or motor.Name ~= "SleeveMotor" then return end
+		local sx = (library_flags["skinSleeveX"] or 0) / 25
+		local sy = (library_flags["skinSleeveY"] or 0) / 25
+		local sz = (library_flags["skinSleeveZ"] or 0) / 25
+		if not library_flags["skinSleeveChangerToggle"] then
+			sx, sy, sz = 0, 0, 0
+		end
+		local offset = CFrame.new(sx, sy, -sz):Inverse()
+		local origC0 = motor:GetAttribute("OrigC0")
+		if not origC0 then
+			origC0 = motor.C0; motor:SetAttribute("OrigC0", origC0)
+		end
+		local origC1 = motor:GetAttribute("OrigC1")
+		if not origC1 then
+			origC1 = motor.C1; motor:SetAttribute("OrigC1", origC1)
+		end
+		motor.C0 = origC0
+		motor.C1 = origC1 * offset
+	end
+	local function isManagedSleevePart(part)
+		if not part or not (part:IsA("BasePart") or part:IsA("MeshPart")) then return false end
+		local motor = part:FindFirstChild("SleeveMotor")
+		if not motor then return false end
+		if part:GetAttribute("Applied") ~= nil then return true end
+		if part.Name == "Sleeve" then return true end
+		return string.find(string.lower(part.Name), "sleeve") ~= nil
+	end
 	local function applySleeveChangerToCurrent()
 		local arms = Camera and Camera:FindFirstChild("Arms")
 		if not arms then return end
-		local sx = (library_flags["skinSleeveX"] or 0) / 25; local sy = (library_flags["skinSleeveY"] or 0) / 25; local sz = (library_flags["skinSleeveZ"] or 0) / 25
 		for _, d in arms:GetDescendants() do
-			local n = string.lower(d.Name)
-			local isSleeve = string.find(n, "sleeve")
-			if (isSleeve or n == "meshpart" or n == "part") and (d:IsA("BasePart") or d:IsA("MeshPart")) then
-				local motor = d:FindFirstChild("SleeveMotor") or d:FindFirstChildWhichIsA("Motor6D")
-				if motor and (isSleeve or (motor.Part0 and string.find(string.lower(motor.Part0.Name), "arm"))) then
-					local origC0 = motor:GetAttribute("OrigC0")
-					if origC0 then motor.C0 = origC0 end
-					local origC1 = motor:GetAttribute("OrigC1")
-					if not origC1 then
-						origC1 = motor.C1; motor:SetAttribute("OrigC1", origC1)
-					end
-					local offset = CFrame.new(sx, sy, -sz):Inverse()
-					if isSleeve then
-						motor.C1 = origC1 * offset
-					else
-						motor.C1 = origC1 * motor.C0.Rotation:Inverse() * offset * motor.C0.Rotation
-					end
-				end
+			if isManagedSleevePart(d) then
+				applySleevePositionOffset(d:FindFirstChild("SleeveMotor"))
 			end
 		end
 	end
 	env.ApplySleeveChangerToCurrent = applySleeveChangerToCurrent
+	env.applySleevePositionOffset = applySleevePositionOffset
 	game:GetService("RunService").RenderStepped:Connect(function()
 		pcall(applySleeveChangerToCurrent)
 	end)
@@ -7257,11 +8148,38 @@ end
 TabIcons = {
 	["Clarity"] = _loadIcon("movement"), ["clarity"] = _loadIcon("movement"), ["Demos"] = _loadIcon("demos"), ["demos"] = _loadIcon("demos"), ["Legit"] = _loadIcon("legit"), ["legit"] = _loadIcon("legit"), ["Visuals"] = _loadIcon("visuals"), ["visuals"] = _loadIcon("visuals"), ["Misc"] = _loadIcon("misc"), ["misc"] = _loadIcon("misc"), ["Movement"] = _loadIcon("movement"), ["movement"] = _loadIcon("movement"), ["Movement Features"] = _loadIcon("movement"), ["Skins"] = _loadIcon("skins"), ["skins"] = _loadIcon("skins"), ["Config"] = _loadIcon("configs"), ["configs"] = _loadIcon("configs"), ["Configs"] = _loadIcon("configs"), ["Exploits"] = _loadIcon("movement"), ["exploits"] = _loadIcon("movement"), ["World"] = _loadIcon("visuals"), ["world"] = _loadIcon("visuals"), ["Calculator"] = _loadIcon("misc"), ["calculator"] = _loadIcon("misc"), ["Lua"] = _loadIcon("lua"), ["lua"] = _loadIcon("lua"), ["Players"] = _loadIcon("players"), ["players"] = _loadIcon("players")
 }
+local function clarityUiShadow(parent, transparency, spread)
+	spread = spread or 14
+	transparency = transparency or 0.42
+	local sh = Instance.new("ImageLabel")
+	sh.Name = "Shadow"
+	sh.BackgroundTransparency = 1
+	sh.Image = "rbxassetid://6014261993"
+	sh.ImageColor3 = Color3.fromRGB(0, 0, 0)
+	sh.ImageTransparency = transparency
+	sh.ScaleType = Enum.ScaleType.Slice
+	sh.SliceCenter = Rect.new(49, 49, 450, 450)
+	sh.Size = UDim2.new(1, spread, 1, spread)
+	sh.Position = UDim2.new(0, -spread / 2, 0, -spread / 2 + 2)
+	sh.ZIndex = 0
+	sh.Parent = parent
+	return sh
+end
 UI_Library.Init = function(self)
 	if self.hasInit then return end
-	self.hasInit = true; local UI_W, UI_H, UI_SIDEBAR, UI_LOGO_H = 720, 530, 135, 70; local sg = Instance.new("ScreenGui", game:GetService("CoreGui")); sg.ResetOnSpawn = false; sg.Name = "Clarity_Custom"; sg.IgnoreGuiInset = true; self.base = sg; self.open = true; local openColorPicker = nil; local main = Instance.new("ImageButton", sg); self.mainFrame = main; main.AutoButtonColor = false; main.Size = UDim2.new(0, UI_W, 0, UI_H); main.Position = UDim2.new(0.5, -UI_W / 2, 0.5, -UI_H / 2); main.BackgroundColor3 = Color3.fromRGB(16, 17, 16); main.BorderSizePixel = 0
+	self.hasInit = true; local UI_W, UI_H, UI_SIDEBAR, UI_LOGO_H, UI_R = 740, 540, 138, 72, 6; local UI_BG = Color3.fromRGB(12, 12, 12); local UI_PANEL = Color3.fromRGB(14, 14, 14); local UI_RAISE = Color3.fromRGB(15, 15, 15); local UI_TAB = Color3.fromRGB(16, 16, 16); local UI_ELEM = Color3.fromRGB(14, 14, 14); local sg = Instance.new("ScreenGui", game:GetService("CoreGui")); sg.ResetOnSpawn = false; sg.Name = "Clarity_Custom"; sg.IgnoreGuiInset = true; sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; self.base = sg; self.open = true; local openColorPicker = nil; local shadowHost = Instance.new("Frame", sg); shadowHost.Name = "ClarityMenuShadow"; shadowHost.BackgroundTransparency = 1; env._menuShadowHost = shadowHost; local main = Instance.new("ImageButton", sg); self.mainFrame = main; main.AutoButtonColor = false; main.Size = UDim2.new(0, UI_W, 0, UI_H); main.Position = UDim2.new(0.5, -UI_W / 2, 0.5, -UI_H / 2); main.BackgroundColor3 = UI_BG; main.BorderSizePixel = 0
 	main.ClipsDescendants = false
-	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 3); local mainStroke = Instance.new("UIStroke", main); mainStroke.Color = Color3.fromRGB(55, 55, 55); mainStroke.Thickness = 1; mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; main.Active = true; self.mainFrame = main
+	Instance.new("UICorner", main).CornerRadius = UDim.new(0, UI_R); main.Active = true; self.mainFrame = main
+	shadowHost.Size = main.Size; clarityUiShadow(shadowHost, 0.36, 30)
+	local function syncMenuShadow()
+		shadowHost.Size = main.Size
+		shadowHost.Position = UDim2.new(main.Position.X.Scale, main.Position.X.Offset + 4, main.Position.Y.Scale, main.Position.Y.Offset + 6)
+	end
+	syncMenuShadow()
+	main:GetPropertyChangedSignal("Position"):Connect(syncMenuShadow)
+	main:GetPropertyChangedSignal("Size"):Connect(syncMenuShadow)
+	main:GetPropertyChangedSignal("Visible"):Connect(function() shadowHost.Visible = main.Visible end)
+	shadowHost.Visible = main.Visible
 	main:GetPropertyChangedSignal("Visible"):Connect(function()
 		if main.Visible then
 			pcall(function() game:GetService("ContextActionService"):BindActionAtPriority("ClarityMenuSink", function() return Enum.ContextActionResult.Sink end, false, 999999, Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2) end)
@@ -7272,16 +8190,53 @@ UI_Library.Init = function(self)
 	if main.Visible then
 		pcall(function() game:GetService("ContextActionService"):BindActionAtPriority("ClarityMenuSink", function() return Enum.ContextActionResult.Sink end, false, 999999, Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2) end)
 	end
-	local sidebar = Instance.new("Frame", main); sidebar.Size = UDim2.new(0, UI_SIDEBAR, 1, 0); sidebar.BackgroundColor3 = Color3.fromRGB(12, 13, 12); sidebar.BorderSizePixel = 0; Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 3); local logoHeader = Instance.new("Frame", sidebar); logoHeader.Size = UDim2.new(1, 0, 0, UI_LOGO_H); logoHeader.BackgroundTransparency = 1; logoHeader.Parent = sidebar; local logo = Instance.new("ImageLabel", logoHeader); logo.Size = UDim2.new(0, 48, 0, 48); logo.Position = UDim2.new(0.5, -24, 0.5, -24); logo.BackgroundTransparency = 1; logo.Image = "rbxassetid://133384875688188"; logo.ImageColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(255, 255, 255); table.insert(UI_Library.theme, logo); local logoSep = Instance.new("Frame", sidebar); logoSep.Size = UDim2.new(0.8, 0, 0, 1); logoSep.Position = UDim2.new(0.1, 0, 0, UI_LOGO_H); logoSep.BackgroundColor3 = Color3.fromRGB(40, 40, 40); logoSep.BorderSizePixel = 0; local sidebarDiv = Instance.new("Frame", main); sidebarDiv.Size = UDim2.new(0, 1, 1, -16); sidebarDiv.Position = UDim2.new(0, UI_SIDEBAR, 0, 8); sidebarDiv.BackgroundColor3 = Color3.fromRGB(40, 40, 40); sidebarDiv.BorderSizePixel = 0; local tabContainer = Instance.new("ScrollingFrame", sidebar); tabContainer.Size = UDim2.new(1, 0, 1, -UI_LOGO_H); tabContainer.Position = UDim2.new(0, 0, 0, UI_LOGO_H); tabContainer.BackgroundTransparency = 1; tabContainer.BorderSizePixel = 0; tabContainer.ScrollBarThickness = 1; tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0); tabContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y; local list = Instance.new("UIListLayout", tabContainer); list.Padding = UDim.new(0, 3); list.HorizontalAlignment = Enum.HorizontalAlignment.Center; list.SortOrder = Enum.SortOrder.LayoutOrder
+	local sidebar = Instance.new("Frame", main); sidebar.Size = UDim2.new(0, UI_SIDEBAR, 1, 0); sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 10); sidebar.BorderSizePixel = 0; Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, UI_R); local logoHeader = Instance.new("Frame", sidebar); logoHeader.Size = UDim2.new(1, 0, 0, UI_LOGO_H); logoHeader.BackgroundTransparency = 1; logoHeader.Parent = sidebar; local logo = Instance.new("ImageLabel", logoHeader); logo.Size = UDim2.new(0, 52, 0, 52); logo.Position = UDim2.new(0.5, -26, 0.5, -26); logo.BackgroundTransparency = 1; logo.Image = "rbxassetid://133384875688188"; logo.ImageColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); table.insert(UI_Library.theme, logo); local logoSep = Instance.new("Frame", sidebar); logoSep.Size = UDim2.new(0.8, 0, 0, 1); logoSep.Position = UDim2.new(0.1, 0, 0, UI_LOGO_H); logoSep.BackgroundColor3 = UI_TAB; logoSep.BackgroundTransparency = 0.35; logoSep.BorderSizePixel = 0; local sidebarDiv = Instance.new("Frame", main); sidebarDiv.Size = UDim2.new(0, 1, 1, -16); sidebarDiv.Position = UDim2.new(0, UI_SIDEBAR, 0, 8); sidebarDiv.BackgroundColor3 = UI_TAB; sidebarDiv.BackgroundTransparency = 0.35; sidebarDiv.BorderSizePixel = 0; local tabContainer = Instance.new("ScrollingFrame", sidebar); tabContainer.Size = UDim2.new(1, 0, 1, -UI_LOGO_H); tabContainer.Position = UDim2.new(0, 0, 0, UI_LOGO_H); tabContainer.BackgroundTransparency = 1; tabContainer.BorderSizePixel = 0; tabContainer.ScrollBarThickness = 1; tabContainer.CanvasSize = UDim2.new(0, 0, 0, 0); tabContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y; local list = Instance.new("UIListLayout", tabContainer); list.Padding = UDim.new(0, 3); list.HorizontalAlignment = Enum.HorizontalAlignment.Center; list.SortOrder = Enum.SortOrder.LayoutOrder
 	local floatingDropdowns = {}
 	local content = Instance.new("Frame", main); content.Size = UDim2.new(1, -145, 1, -20); content.Position = UDim2.new(0, 140, 0, 10); content.BackgroundTransparency = 1; content.BorderSizePixel = 0; local activePage = nil; local activeBtn = nil; local previewWin = Instance.new("Frame", main); previewWin.Size = UDim2.new(0, 240, 0, 360); previewWin.Position = UDim2.new(1, 35, 0, 0); previewWin.BackgroundColor3 = Color3.fromRGB(15, 15, 15); previewWin.Visible = false; Instance.new("UICorner", previewWin).CornerRadius = UDim.new(0, 3); local previewStroke = Instance.new("UIStroke", previewWin); previewStroke.Color = Color3.fromRGB(25, 25, 25); local previewHeader = Instance.new("TextLabel", previewWin); previewHeader.Size = UDim2.new(1, 0, 0, 25); previewHeader.BackgroundTransparency = 1; previewHeader.Text = "esp preview"; previewHeader.TextColor3 = Color3.fromRGB(140, 140, 140); previewHeader.Font = Enum.Font.Code; previewHeader.TextSize = 13; local viewport = Instance.new("ViewportFrame", previewWin); viewport.Size = UDim2.new(0.9, 0, 0.75, 0); viewport.Position = UDim2.new(0.05, 0, 0.08, 0); viewport.BackgroundTransparency = 1; viewport.Ambient = Color3.fromRGB(200, 200, 200); local cam = Instance.new("Camera"); cam.FieldOfView = 50; viewport.CurrentCamera = cam; cam.Parent = viewport; local light = Instance.new("PointLight", cam); light.Color = Color3.fromRGB(255, 255, 255); light.Brightness = 2; light.Range = 15; local previewModel = Instance.new("Model", viewport); local previewReady = false; local previewDragging = false; local previewLastX = 0; local previewRotY = 0
 	local function rebuildDummy()
+		local function isRigPart(part)
+			if not part or not part:IsA("BasePart") then return false end
+			local n = part.Name
+			return n == "HumanoidRootPart" or n == "Head" or n == "FakeHead" or n == "Hitbox" or n == "HeadHB" or n:match("Torso") or n:match("Leg") or n:match("Arm") or n:match("Hand") or n:match("Foot")
+		end
+		local function isPreviewTrash(inst)
+			if not inst then return false end
+			local n = string.lower(inst.Name)
+			if inst:IsA("Tool") or inst:IsA("BackpackItem") then return true end
+			if inst:IsA("Folder") and (n:find("backpack") or n:find("weapon")) then return true end
+			if inst:IsA("Model") and (inst:FindFirstChildWhichIsA("Tool") or n:find("gun") or n:find("weapon")) then return true end
+			return false
+		end
+		local function isPreviewSkipPart(part)
+			if not part or not part:IsA("BasePart") then return false end
+			local n = part.Name
+			if n == "Gun" or n == "HeadHB" or n == "Hitbox" or n == "FakeHead" or n == "EquippedTool" then return true end
+			if string.find(n, "C4") and n ~= "BackC4" then return true end
+			return false
+		end
+		local function isPreviewCosmeticPart(part)
+			if not part or not part:IsA("BasePart") then return false end
+			local x = part
+			while x and x.Parent do
+				local n = x.Name
+				if n == "Glove" or n == "LGlove" or n == "RGlove" or n == "Sleeve" then return true end
+				if x:GetAttribute("Applied") ~= nil then return true end
+				local ln = string.lower(n)
+				if string.find(ln, "glove") or string.find(ln, "sleeve") then return true end
+				if x.Parent == clone or x == clone then break end
+				x = x.Parent
+			end
+			return false
+		end
 		previewModel:ClearAllChildren(); local ok = false; local src = nil
 		pcall(function()
 			for _, plr in game:GetService("Players"):GetPlayers() do
 				if plr ~= val_733 and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
 					src = plr.Character; break
 				end
+			end
+			if not src and val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart") then
+				src = val_733.Character
 			end
 			if not src then
 				for _, v in workspace:GetChildren() do
@@ -7302,48 +8257,67 @@ UI_Library.Init = function(self)
 					for _, d in clone:GetDescendants() do
 						if d:IsA("BaseScript") or d:IsA("Script") or d:IsA("LocalScript") then d:Destroy() end
 						if d:IsA("BillboardGui") or d:IsA("ForceField") then d:Destroy() end
+						if d:IsA("BasePart") and isPreviewSkipPart(d) then d:Destroy() end
 						if d:IsA("BasePart") then
 							d.Anchored = true; d.CanCollide = false
 						end
 					end
 					for _, d in clone:GetChildren() do
-						if d:IsA("Tool") or d:IsA("BackpackItem") or d:IsA("Folder") then
+						if isPreviewTrash(d) then
 							d:Destroy()
-						elseif d:IsA("Model") then
-							d:Destroy()
-						elseif d:IsA("BasePart") and not (
-							d.Name:match("Torso") or d.Name:match("Leg") or d.Name:match("Arm") or d.Name:match("Hand") or d.Name:match("Foot") or d.Name == "Head" or d.Name == "HumanoidRootPart" or d.Name == "FakeHead" or d.Name == "Hitbox" or d:FindFirstAncestorWhichIsA("Accessory") or d:FindFirstAncestorWhichIsA("Accoutrement")
-						) then
+						elseif d:IsA("BasePart") and not isRigPart(d) and not d:FindFirstAncestorWhichIsA("Accessory") and not d:FindFirstAncestorWhichIsA("Accoutrement") then
 							d:Destroy()
 						end
 					end
 					local hrp = clone:FindFirstChild("HumanoidRootPart")
 					if hrp then
-						local hrpCF = hrp.CFrame; local resolvedCFrames = {}; resolvedCFrames[hrp] = CFrame.new(0, 1, 0)
-						local function resolveJoints()
+						local hrpCF = hrp.CFrame
+						local resolvedCFrames = {}; resolvedCFrames[hrp] = CFrame.new(0, 1, 0)
+						local function resolveJoints(rigOnly)
 							local added = false
 							for _, d in clone:GetDescendants() do
 								if d:IsA("JointInstance") or d:IsA("WeldConstraint") then
 									local p0 = d.Part0; local p1 = d.Part1
-									if p0 and p1 then
+									if p0 and p1 and p0:IsDescendantOf(clone) and p1:IsDescendantOf(clone) then
+										if isPreviewSkipPart(p0) or isPreviewSkipPart(p1) then continue end
 										local c0, c1
 										pcall(function() c0 = d.C0; c1 = d.C1 end)
 										if c0 and c1 then
 											local transform = CFrame.new()
 											if d:IsA("Motor6D") then
-												transform = CFrame.new()
+												transform = d.Transform
 											end
-											if not resolvedCFrames[p1] and resolvedCFrames[p0] then
-												resolvedCFrames[p1] = resolvedCFrames[p0] * c0 * transform * c1:Inverse(); added = true
-											elseif not resolvedCFrames[p0] and resolvedCFrames[p1] then
-												resolvedCFrames[p0] = resolvedCFrames[p1] * c1 * transform:Inverse() * c0:Inverse(); added = true
+											if rigOnly then
+												if isRigPart(p0) and isRigPart(p1) then
+													if not resolvedCFrames[p1] and resolvedCFrames[p0] then
+														resolvedCFrames[p1] = resolvedCFrames[p0] * c0 * transform * c1:Inverse(); added = true
+													elseif not resolvedCFrames[p0] and resolvedCFrames[p1] then
+														resolvedCFrames[p0] = resolvedCFrames[p1] * c1 * transform:Inverse() * c0:Inverse(); added = true
+													end
+												end
+											else
+												if not resolvedCFrames[p1] and resolvedCFrames[p0] and isPreviewCosmeticPart(p1) then
+													resolvedCFrames[p1] = resolvedCFrames[p0] * c0 * transform * c1:Inverse(); added = true
+												elseif not resolvedCFrames[p0] and resolvedCFrames[p1] and isPreviewCosmeticPart(p0) then
+													resolvedCFrames[p0] = resolvedCFrames[p1] * c1 * transform:Inverse() * c0:Inverse(); added = true
+												end
 											end
 										else
 											local rel = p0.CFrame:Inverse() * p1.CFrame
-											if not resolvedCFrames[p1] and resolvedCFrames[p0] then
-												resolvedCFrames[p1] = resolvedCFrames[p0] * rel; added = true
-											elseif not resolvedCFrames[p0] and resolvedCFrames[p1] then
-												resolvedCFrames[p0] = resolvedCFrames[p1] * rel:Inverse(); added = true
+											if rigOnly then
+												if isRigPart(p0) and isRigPart(p1) then
+													if not resolvedCFrames[p1] and resolvedCFrames[p0] then
+														resolvedCFrames[p1] = resolvedCFrames[p0] * rel; added = true
+													elseif not resolvedCFrames[p0] and resolvedCFrames[p1] then
+														resolvedCFrames[p0] = resolvedCFrames[p1] * rel:Inverse(); added = true
+													end
+												end
+											else
+												if not resolvedCFrames[p1] and resolvedCFrames[p0] and isPreviewCosmeticPart(p1) then
+													resolvedCFrames[p1] = resolvedCFrames[p0] * rel; added = true
+												elseif not resolvedCFrames[p0] and resolvedCFrames[p1] and isPreviewCosmeticPart(p0) then
+													resolvedCFrames[p0] = resolvedCFrames[p1] * rel:Inverse(); added = true
+												end
 											end
 										end
 									end
@@ -7352,7 +8326,10 @@ UI_Library.Init = function(self)
 							return added
 						end
 						for i = 1, 30 do
-							if not resolveJoints() then break end
+							if not resolveJoints(true) then break end
+						end
+						for i = 1, 30 do
+							if not resolveJoints(false) then break end
 						end
 						for _, d in clone:GetDescendants() do
 							if d:IsA("BasePart") then
@@ -7360,6 +8337,35 @@ UI_Library.Init = function(self)
 									d.CFrame = resolvedCFrames[d]
 								else
 									d.CFrame = hrpCF:Inverse() * d.CFrame
+								end
+							end
+						end
+						for _, acc in clone:GetDescendants() do
+							if acc:IsA("Accessory") then
+								local handle = acc:FindFirstChild("Handle")
+								if handle and handle:IsA("BasePart") then
+									local weld = handle:FindFirstChild("AccessoryWeld") or handle:FindFirstChildWhichIsA("Weld")
+									if weld and weld.Part0 and weld.Part1 then
+										local body = weld.Part0 == handle and weld.Part1 or weld.Part0
+										if body and body:IsA("BasePart") then
+											local c0, c1 = CFrame.new(), CFrame.new()
+											pcall(function() c0 = weld.C0; c1 = weld.C1 end)
+											handle.CFrame = body.CFrame * c0 * c1:Inverse()
+										end
+									else
+										local att = handle:FindFirstChildOfClass("Attachment")
+										if att then
+											for _, bp in clone:GetDescendants() do
+												if bp:IsA("BasePart") and isRigPart(bp) then
+													local match = bp:FindFirstChild(att.Name)
+													if match and match:IsA("Attachment") then
+														handle.CFrame = bp.CFrame * match.CFrame * att.CFrame:Inverse()
+														break
+													end
+												end
+											end
+										end
+									end
 								end
 							end
 						end
@@ -7414,6 +8420,7 @@ UI_Library.Init = function(self)
 		end
 		previewRotY = 0; previewReady = true; cam.CFrame = CFrame.new(Vector3.new(0, 2.5, -9.5), Vector3.new(0, 0, 0))
 	end
+	env.rebuildEspPreview = rebuildDummy
 	rebuildDummy()
 	spawn(function()
 		while not previewReady do
@@ -7469,30 +8476,30 @@ UI_Library.Init = function(self)
 				local ndcX = (op.X / -op.Z) / (h * r); local ndcY = (op.Y / -op.Z) / h
 				return Vector2.new(viewport.AbsoluteSize.X/2 * (1 + ndcX), viewport.AbsoluteSize.Y/2 * (1 - ndcY))
 			end
-			local pos = get2D(hrp.Position); local top = get2D((hrp.CFrame * CFrame.new(0, 3.4, 0)).Position); local bot = get2D((hrp.CFrame * CFrame.new(0, -3.2, 0)).Position); local height = math.abs(bot.Y - top.Y); local width = height * 0.65; local offset_X = viewport.AbsolutePosition.X - previewWin.AbsolutePosition.X; local offset_Y = viewport.AbsolutePosition.Y - previewWin.AbsolutePosition.Y; boxOverlay.Size = UDim2.new(0, width, 0, height); boxOverlay.Position = UDim2.new(0, pos.X - width/2 + offset_X, 0, top.Y + offset_Y); local isEsp = library_flags["espEnabled"]; local hasArmor = library_flags["Armor Bar"] or library_flags["Armor ESP"] or library_flags["Armor"]
+			local pos = get2D(hrp.Position); local top = get2D((hrp.CFrame * CFrame.new(0, 3.4, 0)).Position); local bot = get2D((hrp.CFrame * CFrame.new(0, -3.2, 0)).Position); local height = math.abs(bot.Y - top.Y); local width = height * 0.65; local offset_X = viewport.AbsolutePosition.X - previewWin.AbsolutePosition.X; local offset_Y = viewport.AbsolutePosition.Y - previewWin.AbsolutePosition.Y; boxOverlay.Size = UDim2.new(0, width, 0, height); boxOverlay.Position = UDim2.new(0, pos.X - width/2 + offset_X, 0, top.Y + offset_Y); local isEsp = library_flags["espEnabled"]; local hasArmor = library_flags["Armor Bar"] or library_flags["Armor ESP"] or library_flags["Armor"]; local espOp = env.espDrawOpacity and env.espDrawOpacity() or 1
 			if isEsp and library_flags["Box ESP"] then
-				stroke.Enabled = true; stroke.Color = library_flags["boxESPcolor"] or Color3.fromRGB(255,255,255)
+				stroke.Enabled = true; stroke.Color = library_flags["boxESPcolor"] or Color3.fromRGB(255,255,255); stroke.Transparency = 1 - espOp
 			else
 				stroke.Enabled = false
 			end
 			if isEsp and library_flags["Box Fill"] then
-				boxFill.Visible = true; boxFill.BackgroundColor3 = library_flags["boxFillColor"] or Color3.fromRGB(255,255,255); local fillTrans = (UI_Library and UI_Library.options and UI_Library.options["Box Fill"] and UI_Library.options["Box Fill"].trans) or 0.5; boxFill.BackgroundTransparency = math.clamp(1 - fillTrans, 0, 1)
+				boxFill.Visible = true; boxFill.BackgroundColor3 = library_flags["boxFillColor"] or Color3.fromRGB(255,255,255); local fillTrans = (UI_Library and UI_Library.options and UI_Library.options["Box Fill"] and UI_Library.options["Box Fill"].trans) or 0.5; boxFill.BackgroundTransparency = math.clamp(1 - espOp * (1 - fillTrans), 0, 1)
 			else
 				boxFill.Visible = false
 			end
-			boxOverlay.Visible = isEsp and (library_flags["Box ESP"] or library_flags["Box Fill"] or library_flags["Name ESP"] or library_flags["Health Bar"] or hasArmor or library_flags["Weapon ESP"] or library_flags["Distance ESP"] or library_flags["Info ESP"]); nameLabel.Visible = isEsp and library_flags["Name ESP"]; nameLabel.TextColor3 = library_flags["nameESPcolor"] or Color3.fromRGB(255,255,255); healthBarBg.Visible = isEsp and library_flags["Health Bar"]; healthBarFill.BackgroundColor3 = library_flags["healthBar"] or Color3.fromRGB(0, 255, 0); armorBarBg.Visible = isEsp and hasArmor; armorBarFill.BackgroundColor3 = library_flags["armorBarColor"] or Color3.fromRGB(0, 100, 255)
+			boxOverlay.Visible = isEsp and (library_flags["Box ESP"] or library_flags["Box Fill"] or library_flags["Name ESP"] or library_flags["Health Bar"] or hasArmor or library_flags["Weapon ESP"] or library_flags["Distance ESP"] or library_flags["Info ESP"]); nameLabel.Visible = isEsp and library_flags["Name ESP"]; nameLabel.TextColor3 = library_flags["nameESPcolor"] or Color3.fromRGB(255,255,255); nameLabel.TextTransparency = 1 - espOp; healthBarBg.Visible = isEsp and library_flags["Health Bar"]; healthBarBg.BackgroundTransparency = 1 - espOp; healthBarFill.BackgroundColor3 = library_flags["healthBar"] or Color3.fromRGB(0, 255, 0); healthBarFill.BackgroundTransparency = 1 - espOp; armorBarBg.Visible = isEsp and hasArmor; armorBarBg.BackgroundTransparency = 1 - espOp; armorBarFill.BackgroundColor3 = library_flags["armorBarColor"] or Color3.fromRGB(0, 100, 255); armorBarFill.BackgroundTransparency = 1 - espOp; healthText.TextTransparency = 1 - espOp
 			if library_flags["Health Bar"] and not hasArmor then
 				healthBarBg.Position = UDim2.new(0, -6, 0, 0)
 			elseif library_flags["Health Bar"] and hasArmor then
 				healthBarBg.Position = UDim2.new(0, -5, 0, 0); armorBarBg.Position = UDim2.new(0, -9, 0, 0)
 			end
-			wepLabel.Visible = isEsp and library_flags["Weapon ESP"]; distLabel.Visible = isEsp and library_flags["Distance ESP"]; wepLabel.TextColor3 = library_flags["weaponESPcolor"] or Color3.fromRGB(200, 200, 200); distLabel.TextColor3 = library_flags["distanceESPcolor"] or Color3.fromRGB(255, 255, 255)
+			wepLabel.Visible = isEsp and library_flags["Weapon ESP"]; distLabel.Visible = isEsp and library_flags["Distance ESP"]; wepLabel.TextColor3 = library_flags["weaponESPcolor"] or Color3.fromRGB(200, 200, 200); distLabel.TextColor3 = library_flags["distanceESPcolor"] or Color3.fromRGB(255, 255, 255); wepLabel.TextTransparency = 1 - espOp; distLabel.TextTransparency = 1 - espOp
 			if not library_flags["Distance ESP"] and library_flags["Weapon ESP"] then
 				wepLabel.Position = UDim2.new(0, 0, 1, 2)
 			else
 				wepLabel.Position = UDim2.new(0, 0, 1, 15)
 			end
-			infoLabel.Visible = isEsp and library_flags["Info ESP"]; flagsLabel.Visible = isEsp and library_flags["Flags ESP"]; flagsLabel.TextColor3 = library_flags["flagsESPcolor"] or Color3.fromRGB(255, 255, 255); local prFlags = {}; local _sel = library_flags["flagsList"]
+			infoLabel.Visible = isEsp and library_flags["Info ESP"]; flagsLabel.Visible = isEsp and library_flags["Flags ESP"]; flagsLabel.TextColor3 = library_flags["flagsESPcolor"] or Color3.fromRGB(255, 255, 255); infoLabel.TextTransparency = 1 - espOp; flagsLabel.TextTransparency = 1 - espOp; local prFlags = {}; local _sel = library_flags["flagsList"]
 			local function _on(n) return (type(_sel) ~= "table") or _sel[n] end
 			if _on("Armored") then prFlags[#prFlags+1] = "Armored" end
 			if _on("Unarmored") then prFlags[#prFlags+1] = "Unarmored" end
@@ -7509,7 +8516,7 @@ UI_Library.Init = function(self)
 				flagsLabel.Position = UDim2.new(1, 4, 0, 0)
 			end
 			if isEsp and library_flags["Tracers"] then
-				tracerLine.Visible = true; tracerLine.BackgroundColor3 = library_flags["tracersColor"] or Color3.fromRGB(255,255,255); local startX, startY = previewWin.AbsoluteSize.X / 2, previewWin.AbsoluteSize.Y
+				tracerLine.Visible = true; tracerLine.BackgroundColor3 = library_flags["tracersColor"] or Color3.fromRGB(255,255,255); tracerLine.BackgroundTransparency = 1 - espOp; local startX, startY = previewWin.AbsoluteSize.X / 2, previewWin.AbsoluteSize.Y
 				local endX, endY = boxOverlay.Position.X.Offset + (width/2), boxOverlay.Position.Y.Offset + height
 				local distance = math.sqrt((endX - startX)^2 + (endY - startY)^2)
 				tracerLine.Size = UDim2.new(0, 1, 0, distance); tracerLine.Position = UDim2.new(0, startX, 0, startY)
@@ -7586,7 +8593,7 @@ UI_Library.Init = function(self)
                     local j1 = previewModel:FindFirstChild(v[1], true); local j2 = previewModel:FindFirstChild(v[2], true); local line = skelLines[i]
                     if line and j1 and j2 then
                         local p1 = get2D(j1.Position); local p2 = get2D(j2.Position); p1 = Vector2.new(p1.X + offset_X, p1.Y + offset_Y); p2 = Vector2.new(p2.X + offset_X, p2.Y + offset_Y); local dist = (p2 - p1).Magnitude; line.Size = UDim2.new(0, dist, 0, 1); line.Position = UDim2.new(0, (p1.X + p2.X)/2, 0, (p1.Y + p2.Y)/2); line.Rotation = math.deg(math.atan2(p2.Y - p1.Y, p2.X - p1.X))
-						line.BackgroundColor3 = skelClr
+						line.BackgroundColor3 = skelClr; line.BackgroundTransparency = 1 - espOp
                         line.Visible = true
                     end
                 end
@@ -7598,7 +8605,7 @@ UI_Library.Init = function(self)
 		end
 	end)
 	for index, tab in self.tabs do
-		local tabBtn = Instance.new("TextButton", tabContainer); tabBtn.LayoutOrder = index * 10; tabBtn.Size = UDim2.new(0, 130, 0, 32); tabBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); tabBtn.BackgroundTransparency = 1; tabBtn.Text = ""; Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 3); local tabAccent = Instance.new("Frame", tabBtn); tabAccent.Name = "TabAccent"; tabAccent.Size = UDim2.new(0, 2, 1, -8); tabAccent.Position = UDim2.new(0, 0, 0, 4); tabAccent.BackgroundColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); tabAccent.BorderSizePixel = 0; tabAccent.Visible = false; table.insert(UI_Library.theme, tabAccent); local tabIcon = Instance.new("ImageLabel", tabBtn)
+		local tabBtn = Instance.new("TextButton", tabContainer); tabBtn.LayoutOrder = index * 10; tabBtn.Size = UDim2.new(0, 130, 0, 34); tabBtn.BackgroundColor3 = UI_TAB; tabBtn.BackgroundTransparency = 1; tabBtn.Text = ""; Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 5); local tabAccent = Instance.new("Frame", tabBtn); tabAccent.Name = "TabAccent"; tabAccent.Size = UDim2.new(0, 2, 1, -8); tabAccent.Position = UDim2.new(0, 0, 0, 4); tabAccent.BackgroundColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); tabAccent.BorderSizePixel = 0; tabAccent.Visible = false; table.insert(UI_Library.theme, tabAccent); local tabIcon = Instance.new("ImageLabel", tabBtn)
 		local icTitle = tostring(tab.title or ""):lower():gsub("(%a)(%w*)", function(a, b) return a:upper() .. b end)
 		if icTitle == "Demos" then
 			tabIcon.Size = UDim2.new(0, 48, 0, 48); tabIcon.Position = UDim2.new(0, -4, 0.5, -24)
@@ -7621,10 +8628,10 @@ UI_Library.Init = function(self)
 				local hdr = Instance.new("TextLabel", parent); hdr.Size = UDim2.new(1, 0, 0, 18); hdr.BackgroundTransparency = 1; hdr.Text = title:lower(); hdr.TextColor3 = Color3.fromRGB(140, 140, 140); hdr.Font = Enum.Font.Code; hdr.TextSize = 13; hdr.TextXAlignment = Enum.TextXAlignment.Left; hdr.LayoutOrder = order; return hdr
 			end
 			local function makeHomeBtn(parent, text, order, callback)
-				local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(1, 0, 0, 30); btn.BackgroundColor3 = Color3.fromRGB(26, 26, 26); btn.BorderSizePixel = 0; btn.Text = text:lower(); btn.Font = Enum.Font.Code; btn.TextSize = 13; btn.TextColor3 = Color3.fromRGB(220, 220, 220); btn.AutoButtonColor = false; btn.LayoutOrder = order
-				Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 3); local st = Instance.new("UIStroke", btn); st.Color = Color3.fromRGB(38, 38, 38); st.Thickness = 1
-				btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(34, 34, 34) end)
-				btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(26, 26, 26) end)
+				local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(1, 0, 0, 30); btn.BackgroundColor3 = UI_PANEL; btn.BorderSizePixel = 0; btn.Text = text:lower(); btn.Font = Enum.Font.Code; btn.TextSize = 13; btn.TextColor3 = Color3.fromRGB(220, 220, 220); btn.AutoButtonColor = false; btn.LayoutOrder = order
+				Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 3)
+				btn.MouseEnter:Connect(function() btn.BackgroundColor3 = UI_TAB end)
+				btn.MouseLeave:Connect(function() btn.BackgroundColor3 = UI_PANEL end)
 				btn.MouseButton1Click:Connect(callback); return btn
 			end
 			local function serverHop()
@@ -8273,16 +9280,58 @@ UI_Library.Init = function(self)
 		for _, data in allColumns do
 			local col = data.col; local sub = data.sub; local targetCol = (col.position == 1 or col.position == "1") and rightCol or leftCol
 			for _, sec in col.sections or {} do
-				local secFrame = Instance.new("Frame", targetCol); secFrame.Size = UDim2.new(1, 0, 0, 0); secFrame.AutomaticSize = Enum.AutomaticSize.Y; secFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18); secFrame.BorderSizePixel = 0; Instance.new("UICorner", secFrame).CornerRadius = UDim.new(0, 3); sec.main = secFrame
+				local secWrap = Instance.new("Frame", targetCol); secWrap.Size = UDim2.new(1, 0, 0, 0); secWrap.AutomaticSize = Enum.AutomaticSize.Y; secWrap.BackgroundTransparency = 1; secWrap.ClipsDescendants = false
+				local secUnderlay = Instance.new("Frame", secWrap); secUnderlay.BackgroundTransparency = 1; secUnderlay.Size = UDim2.new(1, 0, 0, 0); secUnderlay.AutomaticSize = Enum.AutomaticSize.Y
+				local secFrame = Instance.new("Frame", secWrap); secFrame.Size = UDim2.new(1, 0, 0, 0); secFrame.AutomaticSize = Enum.AutomaticSize.Y; secFrame.BackgroundColor3 = UI_PANEL; secFrame.BorderSizePixel = 0; secFrame.ClipsDescendants = false; Instance.new("UICorner", secFrame).CornerRadius = UDim.new(0, 6); sec.main = secFrame
 				if #tab.subtabs > 0 then
-					table.insert(secFramesToToggle, {frame = secFrame, sub = sub}); secFrame.Visible = (sub == tab.subtabs[1])
+					table.insert(secFramesToToggle, {frame = secWrap, sub = sub}); secWrap.Visible = (sub == tab.subtabs[1])
 				end
 				if tab.title == "Legit" and (sec.title == "Rifles" or sec.title == "Scout" or sec.title == "AWP" or sec.title == "Heavy Pistols" or sec.title == "Pistols" or sec.title == "SMG" or sec.title == "Other") then
-					secFrame.Visible = false
+					secWrap.Visible = false
 				end
-				local stroke = Instance.new("UIStroke", secFrame); stroke.Color = Color3.fromRGB(38, 38, 38); stroke.Thickness = 1; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; local secList = Instance.new("UIListLayout", secFrame); secList.Padding = UDim.new(0, 4); secList.HorizontalAlignment = Enum.HorizontalAlignment.Center; secList.SortOrder = Enum.SortOrder.LayoutOrder; local secPad = Instance.new("UIPadding", secFrame); secPad.PaddingTop = UDim.new(0, 0); secPad.PaddingBottom = UDim.new(0, 8); local secHeaderBar = Instance.new("Frame", secFrame); secHeaderBar.Size = UDim2.new(1, 0, 0, 26); secHeaderBar.BackgroundColor3 = Color3.fromRGB(26, 26, 26); secHeaderBar.BorderSizePixel = 0; secHeaderBar.LayoutOrder = 0; Instance.new("UICorner", secHeaderBar).CornerRadius = UDim.new(0, 3); local headerMask = Instance.new("Frame", secHeaderBar); headerMask.Size = UDim2.new(1, 0, 0.5, 0); headerMask.Position = UDim2.new(0, 0, 0.5, 0); headerMask.BackgroundColor3 = Color3.fromRGB(26, 26, 26); headerMask.BorderSizePixel = 0; headerMask.ZIndex = secHeaderBar.ZIndex; local secHeader = Instance.new("TextLabel", secHeaderBar); secHeader.Size = UDim2.new(1, -20, 1, 0); secHeader.Position = UDim2.new(0, 12, 0, 0); secHeader.BackgroundTransparency = 1; secHeader.Text = tostring(sec.title or "unnamed"):lower(); secHeader.TextColor3 = Color3.fromRGB(235, 235, 235); secHeader.Font = Enum.Font.Code; secHeader.TextSize = 13; secHeader.TextXAlignment = Enum.TextXAlignment.Left; secHeader.ZIndex = secHeaderBar.ZIndex + 1; local headerLine = Instance.new("Frame", secFrame); headerLine.Size = UDim2.new(1, 0, 0, 1); headerLine.BackgroundColor3 = Color3.fromRGB(38, 38, 38); headerLine.BorderSizePixel = 0; headerLine.LayoutOrder = 0; local totalHeight = 27; local boundBinds = {}
+				local function syncSecShadow()
+					secUnderlay.Size = secFrame.Size
+					if secUnderlay:FindFirstChild("Shadow") then
+						secUnderlay.Shadow.Size = UDim2.new(1, 14, 1, 14)
+					end
+				end
+				clarityUiShadow(secUnderlay, 0.62, 14)
+				secFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncSecShadow)
+				task.defer(syncSecShadow)
+				local secList = Instance.new("UIListLayout", secFrame); secList.Padding = UDim.new(0, 4); secList.HorizontalAlignment = Enum.HorizontalAlignment.Center; secList.SortOrder = Enum.SortOrder.LayoutOrder; local secPad = Instance.new("UIPadding", secFrame); secPad.PaddingTop = UDim.new(0, 0); secPad.PaddingBottom = UDim.new(0, 8); local secHeaderBar = Instance.new("Frame", secFrame); secHeaderBar.Size = UDim2.new(1, 0, 0, 26); secHeaderBar.BackgroundColor3 = UI_RAISE; secHeaderBar.BorderSizePixel = 0; secHeaderBar.LayoutOrder = 0; Instance.new("UICorner", secHeaderBar).CornerRadius = UDim.new(0, 6); local headerMask = Instance.new("Frame", secHeaderBar); headerMask.Size = UDim2.new(1, 0, 0.5, 0); headerMask.Position = UDim2.new(0, 0, 0.5, 0); headerMask.BackgroundColor3 = UI_RAISE; headerMask.BorderSizePixel = 0; headerMask.ZIndex = secHeaderBar.ZIndex; local secHeader = Instance.new("TextLabel", secHeaderBar); secHeader.Size = UDim2.new(1, -20, 1, 0); secHeader.Position = UDim2.new(0, 12, 0, 0); secHeader.BackgroundTransparency = 1; secHeader.Text = tostring(sec.title or "unnamed"):lower(); secHeader.TextColor3 = Color3.fromRGB(235, 235, 235); secHeader.Font = Enum.Font.Code; secHeader.TextSize = 13; 				secHeader.TextXAlignment = Enum.TextXAlignment.Left; secHeader.ZIndex = secHeaderBar.ZIndex + 1; local totalHeight = 27; local boundBinds = {}
+				local activePanel = "features"
+				local panelOptFrames = {}
+				local secTitleLower = tostring(sec.title or ""):lower()
+				local hasPanelTabs = secTitleLower == "indicators" or secTitleLower == "graphs"
+				local panelTabBar, featuresTabBtn, prefsTabBtn
+				if hasPanelTabs then
+					panelTabBar = Instance.new("Frame", secFrame); panelTabBar.Size = UDim2.new(1, 0, 0, 24); panelTabBar.BackgroundTransparency = 1; panelTabBar.LayoutOrder = 1
+					featuresTabBtn = Instance.new("TextButton", panelTabBar); featuresTabBtn.Size = UDim2.new(0.5, 0, 1, 0); featuresTabBtn.BackgroundTransparency = 1; featuresTabBtn.Text = "features"; featuresTabBtn.Font = Enum.Font.Code; featuresTabBtn.TextSize = 12; featuresTabBtn.TextColor3 = Color3.fromRGB(0, 255, 80); featuresTabBtn.AutoButtonColor = false
+					local featLine = Instance.new("Frame", featuresTabBtn); featLine.Size = UDim2.new(1, -16, 0, 1); featLine.Position = UDim2.new(0, 8, 1, -2); featLine.BackgroundColor3 = Color3.fromRGB(0, 255, 80); featLine.BorderSizePixel = 0
+					prefsTabBtn = Instance.new("TextButton", panelTabBar); prefsTabBtn.Size = UDim2.new(0.5, 0, 1, 0); prefsTabBtn.Position = UDim2.new(0.5, 0, 0, 0); prefsTabBtn.BackgroundTransparency = 1; prefsTabBtn.Text = "preferences"; prefsTabBtn.Font = Enum.Font.Code; prefsTabBtn.TextSize = 12; prefsTabBtn.TextColor3 = Color3.fromRGB(120, 120, 120); prefsTabBtn.AutoButtonColor = false
+					local prefLine = Instance.new("Frame", prefsTabBtn); prefLine.Size = UDim2.new(1, -16, 0, 1); prefLine.Position = UDim2.new(0, 8, 1, -2); prefLine.BackgroundColor3 = Color3.fromRGB(0, 255, 80); prefLine.BorderSizePixel = 0; prefLine.Visible = false
+					local function setPanelTab(panel)
+						activePanel = panel
+						for _, data in panelOptFrames do
+							data.frame.Visible = data.panel == panel
+						end
+						local active = Color3.fromRGB(0, 255, 80); local idle = Color3.fromRGB(120, 120, 120)
+						featuresTabBtn.TextColor3 = panel == "features" and active or idle
+						prefsTabBtn.TextColor3 = panel == "preferences" and active or idle
+						featLine.Visible = panel == "features"
+						prefLine.Visible = panel == "preferences"
+					end
+					featuresTabBtn.MouseButton1Click:Connect(function() setPanelTab("features") end)
+					prefsTabBtn.MouseButton1Click:Connect(function() setPanelTab("preferences") end)
+					totalHeight = totalHeight + 24
+				end
 				for _, opt in sec.options or {} do
-					local optFrame = Instance.new("Frame", secFrame); optFrame.Size = UDim2.new(0.9, 0, 0, 22); optFrame.BackgroundTransparency = 1; optFrame.LayoutOrder = _ + 1; local rawText = opt.text or opt.flag or "unnamed"
+					local optFrame = Instance.new("Frame", secFrame); optFrame.Size = UDim2.new(0.9, 0, 0, 22); optFrame.BackgroundTransparency = 1; optFrame.LayoutOrder = _ + (hasPanelTabs and 2 or 1); local rawText = opt.text or opt.flag or "unnamed"
+					if hasPanelTabs then
+						local panel = opt.screenPanel or "features"
+						table.insert(panelOptFrames, { frame = optFrame, panel = panel })
+						optFrame.Visible = panel == activePanel
+					end
 					if rawText == "nil" and opt.flag then rawText = opt.flag end
 					local optText = tostring(rawText):lower()
 					if optText:find("material") then optText = "material" end
@@ -8319,7 +9368,7 @@ UI_Library.Init = function(self)
 						end
 						opt.hasInit = true
 						if associatedBind then
-							local bindBtn = Instance.new("TextButton", optFrame); bindBtn.Size = UDim2.new(0, 45, 0, 16); bindBtn.Position = UDim2.new(1, -50, 0.5, -8); bindBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 24); bindBtn.Text = shortenBindName(associatedBind.key or "none"); bindBtn.TextColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); table.insert(UI_Library.theme, bindBtn); bindBtn.Font = Enum.Font.Code; bindBtn.TextSize = 11; Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 3); local listening = false
+							local bindBtn = Instance.new("TextButton", optFrame); bindBtn.Size = UDim2.new(0, 45, 0, 16); bindBtn.Position = UDim2.new(1, -50, 0.5, -8); bindBtn.BackgroundColor3 = UI_ELEM; bindBtn.Text = shortenBindName(associatedBind.key or "none"); bindBtn.TextColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); table.insert(UI_Library.theme, bindBtn); bindBtn.Font = Enum.Font.Code; bindBtn.TextSize = 11; Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 3); local listening = false
 							bindBtn.MouseButton1Click:Connect(function()
 								listening = not listening; env.bindListening = listening; bindBtn.Text = listening and "..." or shortenBindName(associatedBind.key or "none")
 							end)
@@ -8392,7 +9441,7 @@ UI_Library.Init = function(self)
 							end
 						end
 					elseif opt.type == "slider" then
-						local accent = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 200, 50); local label = Instance.new("TextLabel", optFrame); label.Size = UDim2.new(0.55, 0, 1, 0); label.BackgroundTransparency = 1; label.Text = optText; label.TextColor3 = Color3.fromRGB(170, 170, 170); label.Font = Enum.Font.Code; label.TextSize = 12; label.TextXAlignment = Enum.TextXAlignment.Left; local valLabel = Instance.new("TextLabel", optFrame); valLabel.Size = UDim2.new(0, 26, 1, 0); valLabel.Position = UDim2.new(0.55, 0, 0, 0); valLabel.BackgroundTransparency = 1; valLabel.Text = tostring(opt.value or opt.state or 0); valLabel.TextColor3 = accent; valLabel.Font = Enum.Font.Code; valLabel.TextSize = 12; valLabel.TextXAlignment = Enum.TextXAlignment.Left; local bar = Instance.new("TextButton", optFrame); bar.Size = UDim2.new(0.35, 0, 0, 4); bar.Position = UDim2.new(0.65, 0, 0.5, -2); bar.BackgroundColor3 = Color3.fromRGB(28, 28, 28); bar.BorderSizePixel = 0; bar.Text = ""; bar.Active = true; bar.AutoButtonColor = false; Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0); local fill = Instance.new("Frame", bar); local fillPercent = math.clamp((tonumber(opt.value or opt.state or 0) - (opt.min or 0)) / ((opt.max or 100) - (opt.min or 0)), 0, 1); fill.Size = UDim2.new(fillPercent, 0, 1, 0); fill.BackgroundColor3 = accent; fill.BorderSizePixel = 0; Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0); local dragging = false
+						local accent = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 200, 50); local label = Instance.new("TextLabel", optFrame); label.Size = UDim2.new(0.55, 0, 1, 0); label.BackgroundTransparency = 1; label.Text = optText; label.TextColor3 = Color3.fromRGB(170, 170, 170); label.Font = Enum.Font.Code; label.TextSize = 12; label.TextXAlignment = Enum.TextXAlignment.Left; local valLabel = Instance.new("TextLabel", optFrame); valLabel.Size = UDim2.new(0, 26, 1, 0); valLabel.Position = UDim2.new(0.55, 0, 0, 0); valLabel.BackgroundTransparency = 1; valLabel.Text = tostring(opt.value or opt.state or 0); valLabel.TextColor3 = accent; valLabel.Font = Enum.Font.Code; valLabel.TextSize = 12; valLabel.TextXAlignment = Enum.TextXAlignment.Left; local bar = Instance.new("TextButton", optFrame); bar.Size = UDim2.new(0.35, 0, 0, 4); bar.Position = UDim2.new(0.65, 0, 0.5, -2); bar.BackgroundColor3 = UI_TAB; bar.BorderSizePixel = 0; bar.Text = ""; bar.Active = true; bar.AutoButtonColor = false; Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0); local fill = Instance.new("Frame", bar); local fillPercent = math.clamp((tonumber(opt.value or opt.state or 0) - (opt.min or 0)) / ((opt.max or 100) - (opt.min or 0)), 0, 1); fill.Size = UDim2.new(fillPercent, 0, 1, 0); fill.BackgroundColor3 = accent; fill.BorderSizePixel = 0; Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0); local dragging = false
 						local function updateSlider(input)
 							local percent = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1); local min = opt.min or 0; local max = opt.max or 100; local val = math.floor(min + (max - min) * percent); opt.value = val; valLabel.Text = tostring(val); fill.Size = UDim2.new(percent, 0, 1, 0); library_flags[opt.flag] = val; pcall(opt.callback, val)
 						end
@@ -8419,7 +9468,7 @@ UI_Library.Init = function(self)
 							if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 						end)
 					elseif opt.type == "dropdown" or opt.type == "list" then
-						optFrame.Size = UDim2.new(0.9, 0, 0, 42); local label = Instance.new("TextLabel", optFrame); label.Size = UDim2.new(1, 0, 0, 16); label.Position = UDim2.new(0, 0, 0, 0); label.BackgroundTransparency = 1; label.Text = optText; label.TextColor3 = Color3.fromRGB(170, 170, 170); label.Font = Enum.Font.Code; label.TextSize = 12; label.TextXAlignment = Enum.TextXAlignment.Left; local dropBtn = Instance.new("TextButton", optFrame); dropBtn.Size = UDim2.new(1, 0, 0, 22); dropBtn.Position = UDim2.new(0, 0, 0, 18); dropBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); local _initText
+						optFrame.Size = UDim2.new(0.9, 0, 0, 42); local label = Instance.new("TextLabel", optFrame); label.Size = UDim2.new(1, 0, 0, 16); label.Position = UDim2.new(0, 0, 0, 0); label.BackgroundTransparency = 1; label.Text = optText; label.TextColor3 = Color3.fromRGB(170, 170, 170); label.Font = Enum.Font.Code; label.TextSize = 12; label.TextXAlignment = Enum.TextXAlignment.Left; local dropBtn = Instance.new("TextButton", optFrame); dropBtn.Size = UDim2.new(1, 0, 0, 22); dropBtn.Position = UDim2.new(0, 0, 0, 18); dropBtn.BackgroundColor3 = UI_ELEM; local _initText
 						if opt.multiselect or type(opt.value) == "table" then
 							local _names = {}
 							if type(opt.value) == "table" then
@@ -8429,7 +9478,7 @@ UI_Library.Init = function(self)
 						else
 							_initText = tostring(opt.value or opt.state or "none")
 						end
-						dropBtn.Text = "  " .. _initText; dropBtn.TextColor3 = Color3.fromRGB(220, 220, 220); dropBtn.Font = Enum.Font.Code; dropBtn.TextSize = 12; dropBtn.TextXAlignment = Enum.TextXAlignment.Left; dropBtn.AutoButtonColor = false; Instance.new("UICorner", dropBtn).CornerRadius = UDim.new(0, 3); local stroke = Instance.new("UIStroke", dropBtn); stroke.Color = Color3.fromRGB(45, 45, 45); stroke.Thickness = 1; local dropArrow = Instance.new("TextLabel", dropBtn); dropArrow.Size = UDim2.new(0, 16, 1, 0); dropArrow.Position = UDim2.new(1, -18, 0, 0); dropArrow.BackgroundTransparency = 1; dropArrow.Text = "▾"; dropArrow.TextColor3 = Color3.fromRGB(160, 160, 160); dropArrow.Font = Enum.Font.Code; dropArrow.TextSize = 12; local dropList = Instance.new("ScrollingFrame"); dropList.Size = UDim2.new(0, 120, 0, 0); dropList.BackgroundColor3 = Color3.fromRGB(16, 16, 16); dropList.BorderSizePixel = 0; dropList.ZIndex = 100; dropList.Visible = false; dropList.ScrollBarThickness = 1; Instance.new("UICorner", dropList).CornerRadius = UDim.new(0, 4); local listLayout = Instance.new("UIListLayout", dropList); listLayout.SortOrder = Enum.SortOrder.LayoutOrder; local dropItemOrder = 0; dropList.Parent = self.base
+						dropBtn.Text = "  " .. _initText; dropBtn.TextColor3 = Color3.fromRGB(220, 220, 220); dropBtn.Font = Enum.Font.Code; dropBtn.TextSize = 12; dropBtn.TextXAlignment = Enum.TextXAlignment.Left; dropBtn.AutoButtonColor = false; Instance.new("UICorner", dropBtn).CornerRadius = UDim.new(0, 3); local dropArrow = Instance.new("TextLabel", dropBtn); dropArrow.Size = UDim2.new(0, 16, 1, 0); dropArrow.Position = UDim2.new(1, -18, 0, 0); dropArrow.BackgroundTransparency = 1; dropArrow.Text = "▾"; dropArrow.TextColor3 = Color3.fromRGB(160, 160, 160); dropArrow.Font = Enum.Font.Code; dropArrow.TextSize = 12; local dropList = Instance.new("ScrollingFrame"); dropList.Size = UDim2.new(0, 120, 0, 0); dropList.BackgroundColor3 = UI_PANEL; dropList.BorderSizePixel = 0; dropList.ZIndex = 100; dropList.Visible = false; dropList.ScrollBarThickness = 1; Instance.new("UICorner", dropList).CornerRadius = UDim.new(0, 4); local listLayout = Instance.new("UIListLayout", dropList); listLayout.SortOrder = Enum.SortOrder.LayoutOrder; local dropItemOrder = 0; dropList.Parent = self.base
 						table.insert(floatingDropdowns, dropList)
 						opt.labels = opt.labels or {}; opt.open = false; opt.dropList = dropList; opt.dropBtn = dropBtn; opt.listLayout = listLayout
 						function opt:SetValue(val)
@@ -8515,7 +9564,7 @@ UI_Library.Init = function(self)
 							end
 						end)
 					elseif opt.type == "box" then
-						local label = Instance.new("TextLabel", optFrame); label.Size = UDim2.new(0.4, 0, 1, 0); label.BackgroundTransparency = 1; label.Text = optText; label.TextColor3 = Color3.fromRGB(180,180,180); label.Font = Enum.Font.Code; label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; local box = Instance.new("TextBox", optFrame); box.Size = UDim2.new(0.5, 0, 0, 18); box.Position = UDim2.new(0.5, 0, 0.5, -9); box.BackgroundColor3 = Color3.fromRGB(18, 18, 18); box.Text = tostring(opt.value or ""); box.TextColor3 = Color3.fromRGB(200, 200, 200); box.PlaceholderText = "..."; box.Font = Enum.Font.Code; box.TextSize = 12; box.ClearTextOnFocus = false; Instance.new("UICorner", box).CornerRadius = UDim.new(0, 3); local stroke = Instance.new("UIStroke", box); stroke.Color = Color3.fromRGB(35,35,35)
+						local label = Instance.new("TextLabel", optFrame); label.Size = UDim2.new(0.4, 0, 1, 0); label.BackgroundTransparency = 1; label.Text = optText; label.TextColor3 = Color3.fromRGB(180,180,180); label.Font = Enum.Font.Code; label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; local box = Instance.new("TextBox", optFrame); box.Size = UDim2.new(0.5, 0, 0, 18); box.Position = UDim2.new(0.5, 0, 0.5, -9); box.BackgroundColor3 = UI_ELEM; box.Text = tostring(opt.value or ""); box.TextColor3 = Color3.fromRGB(200, 200, 200); box.PlaceholderText = "..."; box.Font = Enum.Font.Code; box.TextSize = 12; box.ClearTextOnFocus = false; Instance.new("UICorner", box).CornerRadius = UDim.new(0, 3)
 						box.FocusLost:Connect(function(enterPressed)
 							opt.value = box.Text; library_flags[opt.flag] = box.Text; pcall(opt.callback, box.Text)
 						end)
@@ -8527,7 +9576,7 @@ UI_Library.Init = function(self)
 							box.Text = tostring(library_flags[opt.flag]); opt.value = library_flags[opt.flag]
 						end
 					elseif opt.type == "button" then
-						local btn = Instance.new("TextButton", optFrame); btn.Size = UDim2.new(0.9, 0, 0, 20); btn.Position = UDim2.new(0.05, 0, 0.5, -10); btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22); btn.Text = optText; btn.TextColor3 = Color3.fromRGB(220, 220, 220); btn.Font = Enum.Font.Code; btn.TextSize = 12; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4); local stroke = Instance.new("UIStroke", btn); stroke.Color = Color3.fromRGB(35,35,35)
+						local btn = Instance.new("TextButton", optFrame); btn.Size = UDim2.new(0.9, 0, 0, 20); btn.Position = UDim2.new(0.05, 0, 0.5, -10); btn.BackgroundColor3 = UI_ELEM; btn.Text = optText; btn.TextColor3 = Color3.fromRGB(220, 220, 220); btn.Font = Enum.Font.Code; btn.TextSize = 12; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
 						btn.MouseButton1Click:Connect(function()
 							pcall(opt.callback)
 						end)
@@ -8541,7 +9590,7 @@ UI_Library.Init = function(self)
 						if isChained then
 							optFrame.Size = UDim2.new(0, 0, 0, 0); optFrame.Visible = false; totalHeight = totalHeight - 26
 						else
-							local label = Instance.new("TextLabel", optFrame); label.Size = UDim2.new(0.6, 0, 1, 0); label.BackgroundTransparency = 1; label.Text = optText; label.TextColor3 = Color3.fromRGB(180,180,180); label.Font = Enum.Font.Code; label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; local bindBtn = Instance.new("TextButton", optFrame); bindBtn.Size = UDim2.new(0, 55, 0, 18); bindBtn.Position = UDim2.new(1, -60, 0.5, -9); bindBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22); bindBtn.Text = shortenBindName(opt.key or opt.state or "none"); bindBtn.TextColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); table.insert(UI_Library.theme, bindBtn); bindBtn.Font = Enum.Font.Code; bindBtn.TextSize = 12; Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 3); local bSt = Instance.new("UIStroke", bindBtn) bSt.Color = Color3.fromRGB(35,35,35); local listening = false
+							local label = Instance.new("TextLabel", optFrame); label.Size = UDim2.new(0.6, 0, 1, 0); label.BackgroundTransparency = 1; label.Text = optText; label.TextColor3 = Color3.fromRGB(180,180,180); label.Font = Enum.Font.Code; label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; local bindBtn = Instance.new("TextButton", optFrame); bindBtn.Size = UDim2.new(0, 55, 0, 18); bindBtn.Position = UDim2.new(1, -60, 0.5, -9); bindBtn.BackgroundColor3 = UI_ELEM; bindBtn.Text = shortenBindName(opt.key or opt.state or "none"); bindBtn.TextColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); table.insert(UI_Library.theme, bindBtn); bindBtn.Font = Enum.Font.Code; bindBtn.TextSize = 12; Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 3); local listening = false
 							bindBtn.MouseButton1Click:Connect(function()
 								listening = not listening; env.bindListening = listening; bindBtn.Text = listening and "..." or shortenBindName(opt.key or opt.state or "none")
 							end)
@@ -8748,7 +9797,7 @@ UI_Library.Init = function(self)
 			if UI_Library.lastSubBtn then
 				UI_Library.lastSubBtn.TextColor3 = Color3.fromRGB(120, 120, 120)
 			end
-			tabLabel.TextColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); tabBtn.BackgroundTransparency = 0.85; tabBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+			tabLabel.TextColor3 = library_flags["Menu Accent Color"] or Color3.fromRGB(0, 255, 0); tabBtn.BackgroundTransparency = 0; tabBtn.BackgroundColor3 = UI_TAB
 			local newAccent = tabBtn:FindFirstChild("TabAccent"); if newAccent then newAccent.Visible = true end
 			UI_Library.lastTabBtn = tabBtn
 			if selSub then
@@ -8762,20 +9811,26 @@ UI_Library.Init = function(self)
 		local function activateTab(targetSub)
 			for _, dl in floatingDropdowns do dl.Visible = false end
 			if activePage then activePage.Visible = false end
-			activePage = pageFrame; activeBtn = tabBtn; pageFrame.Visible = true; previewWin.Visible = (tab.title == "Visuals"); local TS = game:GetService("TweenService"); local ti = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+			activePage = pageFrame; activeBtn = tabBtn; pageFrame.Visible = true
+			local subToUse = nil
+			local TS = game:GetService("TweenService"); local ti = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 			for _, t in self.tabs do
 				if t.subContainer then
 					local targetHeight = (t == tab and #t.subtabs > 0) and (#t.subtabs * 24) or 0; TS:Create(t.subContainer, ti, {Size = UDim2.new(1, 0, 0, targetHeight)}):Play()
 				end
 			end
 			if #tab.subtabs > 0 then
-				local subToUse = targetSub or tab.subtabs[1]
+				subToUse = targetSub or tab.subtabs[1]
 				for _, item in secFramesToToggle do
 					item.frame.Visible = (item.sub == subToUse)
 				end
 				updateSidebarVisuals(tab, subToUse)
 			else
 				updateSidebarVisuals(tab, nil)
+			end
+			previewWin.Visible = tab.title == "Visuals" and subToUse ~= nil and subToUse.title == "Entities"
+			if previewWin.Visible and env.rebuildEspPreview then
+				pcall(env.rebuildEspPreview)
 			end
 		end
 		tabBtn.MouseButton1Click:Connect(function()
@@ -8913,6 +9968,7 @@ UI_Library.Init = function(self)
 				self.open = isVisible; self.open = not self.open
 				if not self.open then env.bindListening = false end
 				if self.mainFrame then self.mainFrame.Visible = self.open end
+				if env._menuShadowHost then env._menuShadowHost.Visible = self.open end
 				if self.base then self.base.Enabled = self.open end
 				env._cursor_outer.Visible = self.open; env._cursor_inner.Visible = self.open; game:GetService("UserInputService").MouseIconEnabled = not self.open; game:GetService("UserInputService").MouseBehavior = self.open and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCenter
 				task.delay(0.2, function() self.toggling = false end)
@@ -8930,6 +9986,7 @@ UI_Library.Init = function(self)
 		end
 		self.open = isVisible; self.open = not self.open
 		if self.mainFrame then self.mainFrame.Visible = self.open end
+		if env._menuShadowHost then env._menuShadowHost.Visible = self.open end
 		if self.base then self.base.Enabled = self.open end
 		env._cursor_outer.Visible = self.open; env._cursor_inner.Visible = self.open; game:GetService("UserInputService").MouseIconEnabled = not self.open; game:GetService("UserInputService").MouseBehavior = self.open and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCenter
 		task.delay(0.2, function() self.toggling = false end)
@@ -9101,7 +10158,7 @@ end
 val_733.OnTeleport:Connect(function(var_47)
 end)
 knifeDebounce = false; invissed = false; chatspamDebounce = 0; textbounded = false; tpdebounce = false; reloading = false; reloaddebounce = false; strafing = false; oldLook = Vector3.new(); oldAmbient = val_699.Ambient 
-oldOutdoorAmbient = val_699.OutdoorAmbient 
+oldOutdoorAmbient = val_699.OutdoorAmbient
 testpart = Instance.new("Part", workspace); testpart.Anchored = true; testpart.Size = Vector3.new(1, 1, 1); testpart.CanCollide = false 
 val_671.InputChanged:Connect(function(var_219)
 	if not library_flags["Override Game Movement"] then
@@ -9178,7 +10235,9 @@ val_690.RenderStepped:Connect(function(var_129)
 		if not val_796 or not val_796.Parent then
 			val_796 = Instance.new("ColorCorrectionEffect", val_699)
 		end
-		val_796.Saturation = library_flags["Saturation"] and library_flags["saturationValue"] / 50 or 0; val_699.ClockTime = library_flags["Time Changer"] and library_flags["time"] / 2 or 14
+		val_796.Saturation = library_flags["ccSaturationEnabled"] and (library_flags["ccSaturation"] or 0) or (library_flags["Saturation"] and library_flags["saturationValue"] / 50 or 0)
+		val_699.ClockTime = library_flags["Time Changer"] and library_flags["time"] or 14
+		if env.applyPostProcessing then env.applyPostProcessing() end
 		if library_flags["Skybox Changer"] and not val_699:FindFirstChild("customsky") then
 			task.spawn(updateSkybox)
 		end
@@ -9250,12 +10309,29 @@ val_690.RenderStepped:Connect(function(var_129)
 			if state == Enum.HumanoidStateType.Freefall and velocity.Y < -8 then
 				local moveDir = Vector3.new(velocity.X, 0, velocity.Z)
 				if moveDir.Magnitude < 0.5 then
-					moveDir = hrp.CFrame.LookVector
+					moveDir = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
+					if moveDir.Magnitude < 0.05 then moveDir = Vector3.new(0, 0, 1) else moveDir = moveDir.Unit end
 				else
 					moveDir = moveDir.Unit
 				end
-				local underRay = workspace:Raycast(hrp.Position, Vector3.new(0, -6, 0), rayParams); local forwardOrigin = hrp.Position + moveDir * 2.0; local forwardRay = workspace:Raycast(forwardOrigin, Vector3.new(0, -6, 0), rayParams); local isEdge = (underRay and not forwardRay) or
-(underRay and forwardRay and (underRay.Position.Y - forwardRay.Position.Y) > 1.0)
+				local underRay = workspace:Raycast(hrp.Position, Vector3.new(0, -6, 0), rayParams)
+				local isEdge = false
+				if underRay then
+					for ahead = 0.6, 3.2, 0.55 do
+						local forwardOrigin = hrp.Position + moveDir * ahead
+						local forwardRay = workspace:Raycast(forwardOrigin, Vector3.new(0, -6, 0), rayParams)
+						local midRay = workspace:Raycast(hrp.Position + moveDir * (ahead * 0.5), Vector3.new(0, -6, 0), rayParams)
+						if forwardRay and not midRay then
+							isEdge = true; break
+						end
+						if underRay and forwardRay and (underRay.Position.Y - forwardRay.Position.Y) > 0.85 then
+							isEdge = true; break
+						end
+						if midRay and not forwardRay and midRay.Normal.Y > 0.45 then
+							isEdge = true; break
+						end
+					end
+				end
 				if isEdge then
 					env.helltracingEdgeDetected = true; env.helltracingEdgeTime = tick()
 					if library_flags["showEBLogs"] then
@@ -9400,6 +10476,7 @@ val_690.RenderStepped:Connect(function(var_129)
 						var_223.arrow.PointB = arrowCenter + Vector2.new(math.cos(angle - 2.5), math.sin(angle - 2.5)) * size
 						var_223.arrow.PointC = arrowCenter + Vector2.new(math.cos(angle + 2.5), math.sin(angle + 2.5)) * size
 						var_223.arrow.Color = library_flags["oofArrowColor"] or Color3.fromRGB(255, 0, 0)
+						var_223.arrow.Transparency = env.espDrawOpacity()
 						var_223.arrow.Visible = true
 					else
 						var_223.arrow.Visible = false
@@ -9428,7 +10505,7 @@ val_690.RenderStepped:Connect(function(var_129)
 				if not val_577 then
 					var_223.invis(); continue 
 				end 
-				local val_578 = library_flags["Font"]; local val_579 = ""
+				local val_578 = library_flags["Font"]; local val_579 = ""; local espOp = env.espDrawOpacity()
 				if var_223 then var_223._isInvis = false end
 				if val_566 then
 					if charExists and val_567.Character:FindFirstChild("EquippedTool") then
@@ -9463,7 +10540,7 @@ val_690.RenderStepped:Connect(function(var_129)
 									if projMinY > chunk then
 										seg.Visible = false
 									else
-										seg.Visible = true; seg.Position = healthPos + Vector2.new(0, projMinY); seg.Size = Vector2.new(2, projMaxY - chunk > 0 and sizePerSegment - (projMaxY - chunk) or sizePerSegment); seg.Color = hpMax:Lerp(hpLow, i / maxSegments)
+										seg.Visible = true; seg.Position = healthPos + Vector2.new(0, projMinY); seg.Size = Vector2.new(2, projMaxY - chunk > 0 and sizePerSegment - (projMaxY - chunk) or sizePerSegment); seg.Color = hpMax:Lerp(hpLow, i / maxSegments); seg.Transparency = espOp
 									end
 								end
 							else
@@ -9487,9 +10564,9 @@ val_690.RenderStepped:Connect(function(var_129)
 						end
 					end 
 					if val_589 then
-						var_223.boxoutline.Position = UI_Library.round(rectMin); var_223.boxoutline.Size = UI_Library.round(rectSize); var_223.box.Position = UI_Library.round(rectMin); var_223.box.Size = UI_Library.round(rectSize); var_223.boxfill.Visible = library_flags["Box Fill"] and true or false
+						local boxOp = espOp; var_223.boxoutline.Position = UI_Library.round(rectMin); var_223.boxoutline.Size = UI_Library.round(rectSize); var_223.box.Position = UI_Library.round(rectMin); var_223.box.Size = UI_Library.round(rectSize); var_223.box.Transparency = boxOp; var_223.boxoutline.Transparency = boxOp; var_223.boxfill.Visible = library_flags["Box Fill"] and true or false
 						if var_223.boxfill.Visible then
-							local t = math.floor(var_223.box.Thickness / 2) + 1; var_223.boxfill.Position = var_223.box.Position + Vector2.new(t, t); var_223.boxfill.Size = var_223.box.Size - Vector2.new(t * 2, t * 2); var_223.boxfill.Color = library_flags["boxFillColor"] or Color3.fromRGB(255,255,255); local fillTrans = UI_Library.options["Box Fill"] and UI_Library.options["Box Fill"].trans or 0.5; var_223.boxfill.Transparency = math.clamp(1 - fillTrans, 0, 1)
+							local t = math.floor(var_223.box.Thickness / 2) + 1; var_223.boxfill.Position = var_223.box.Position + Vector2.new(t, t); var_223.boxfill.Size = var_223.box.Size - Vector2.new(t * 2, t * 2); var_223.boxfill.Color = library_flags["boxFillColor"] or Color3.fromRGB(255,255,255); local fillTrans = UI_Library.options["Box Fill"] and UI_Library.options["Box Fill"].trans or 0.5; var_223.boxfill.Transparency = math.clamp(espOp * (1 - fillTrans), 0, 1)
 						end
 					else
 						var_223.boxfill.Visible = false
@@ -9509,7 +10586,7 @@ val_690.RenderStepped:Connect(function(var_129)
 								if weld and weld.Part0 and weld.Part1 then
 									idx = idx + 1; local ln = var_223.skelLine(idx); local p0, v0 = val_749:WorldToViewportPoint(weld.Part0.Position); local p1, v1 = val_749:WorldToViewportPoint(weld.Part1.Position)
 									if v0 and v1 then
-										ln.From = Vector2.new(math.floor(p0.X), math.floor(p0.Y)); ln.To = Vector2.new(math.floor(p1.X), math.floor(p1.Y)); ln.Color = skelColor; ln.Visible = true
+										ln.From = Vector2.new(math.floor(p0.X), math.floor(p0.Y)); ln.To = Vector2.new(math.floor(p1.X), math.floor(p1.Y)); ln.Color = skelColor; ln.Transparency = espOp; ln.Visible = true
 									else
 										ln.Visible = false
 									end
@@ -9530,7 +10607,7 @@ val_690.RenderStepped:Connect(function(var_129)
 				else
 					var_223.text.Visible = library_flags["Dropped Weapon ESP"]; var_223.text.Color = library_flags["dropESPcolor"]
 				end 
-				local val_580 = val_566 and var_101 or var_223.object.Name; local val_581 = library_flags["Outline"]; var_223.text.Position = Vector2.new(val_571.X, val_571.Y - 15); var_223.text.Font = fonts[val_578]; var_223.text.Outline = val_581; var_223.weapon.Position = UI_Library.round(Vector2.new(val_571.X, val_574.Y + 3)); var_223.weapon.Outline = val_581; var_223.weapon.Font = fonts[val_578]
+				local val_580 = val_566 and var_101 or var_223.object.Name; local val_581 = library_flags["Outline"]; var_223.text.Position = Vector2.new(val_571.X, val_571.Y - 15); var_223.text.Font = fonts[val_578]; var_223.text.Outline = val_581; var_223.text.Transparency = espOp; var_223.weapon.Position = UI_Library.round(Vector2.new(val_571.X, val_574.Y + 3)); var_223.weapon.Outline = val_581; var_223.weapon.Font = fonts[val_578]; var_223.weapon.Transparency = espOp; var_223.tracer.Transparency = espOp; var_223.healthb.Transparency = espOp; var_223.healthbo.Transparency = espOp; var_223.armorb.Transparency = espOp; var_223.armorbo.Transparency = espOp; var_223.healthNum.Transparency = espOp
 				if val_566 and var_223.icon then
 					local showIcon = library_flags["Weapon Icon ESP"] and true or false
 					if showIcon and val_579 and val_579 ~= "" then
@@ -9600,7 +10677,7 @@ val_690.RenderStepped:Connect(function(var_129)
 							if _on("Slowed") and hum and hum.WalkSpeed and hum.WalkSpeed < 12 and hum.WalkSpeed > 0 then fl[#fl+1] = "Slowed" end
 						end
 						if #fl > 0 then
-							var_223.flags.Text = table.concat(fl, "\n"); var_223.flags.Font = fonts[val_578]; var_223.flags.Outline = val_581; var_223.flags.Color = library_flags["flagsESPcolor"] or Color3.fromRGB(255, 255, 255); var_223.flags.Position = Vector2.new(val_571.X + val_576 / 2 + 6, val_571.Y); var_223.flags.Visible = true
+							var_223.flags.Text = table.concat(fl, "\n"); var_223.flags.Font = fonts[val_578]; var_223.flags.Outline = val_581; var_223.flags.Color = library_flags["flagsESPcolor"] or Color3.fromRGB(255, 255, 255); var_223.flags.Transparency = espOp; var_223.flags.Position = Vector2.new(val_571.X + val_576 / 2 + 6, val_571.Y); var_223.flags.Visible = true
 						else
 							var_223.flags.Visible = false
 						end
@@ -9816,32 +10893,19 @@ val_690.RenderStepped:Connect(function(var_129)
 				hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, math.min(currentY + 1.2, speedLimit), hrp.AssemblyLinearVelocity.Z)
 			end
 		end
-		local isMoveHeld = uis:IsKeyDown(Enum.KeyCode.W) or uis:IsKeyDown(Enum.KeyCode.S) or (library_flags["Auto Pixel Surf"] and (uis:IsKeyDown(Enum.KeyCode.A) or uis:IsKeyDown(Enum.KeyCode.D))); local isBindHeld = env.surfingBindHeld; local hum = val_733.Character and val_733.Character:FindFirstChild("Humanoid"); local hrp = val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart"); local isInAir = hum and (hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping or hum.FloorMaterial == Enum.Material.Air); local autoSurfAllowed = library_flags["Auto Pixel Surf"] and isInAir; local bv = hrp and hrp:FindFirstChild("PixelSurfVelocity")
+		local isMoveHeld = uis:IsKeyDown(Enum.KeyCode.W) or uis:IsKeyDown(Enum.KeyCode.S) or (library_flags["Auto Pixel Surf"] and (uis:IsKeyDown(Enum.KeyCode.A) or uis:IsKeyDown(Enum.KeyCode.D))); local isBindHeld = env.surfingBindHeld; local hum = val_733.Character and val_733.Character:FindFirstChild("Humanoid"); local hrp = val_733.Character and val_733.Character:FindFirstChild("HumanoidRootPart"); local isInAir = hum and (hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping or hum.FloorMaterial == Enum.Material.Air); local autoSurfAllowed = library_flags["Auto Pixel Surf"] and isInAir; local psMode = library_flags["Pixel Surf Mode"] or "All Walls"; local moveOk = isMoveHeld; if psMode == "Seams" and (isBindHeld or autoSurfAllowed) then moveOk = true end; local bv = hrp and hrp:FindFirstChild("PixelSurfVelocity")
 		if hrp and not bv then
 			bv = Instance.new("BodyVelocity"); bv.Name = "PixelSurfVelocity"; bv.MaxForce = Vector3.new(0, 0, 0); bv.Parent = hrp
 		end
-		if library_flags["Pixelsurf"] and (isBindHeld or autoSurfAllowed) and isMoveHeld and isInAir and val_872.alive and hrp and bv then
-			local wallPart, wallNormal, wallPos = findWallHit(); env.pixelSurfTouching = wallPart ~= nil
+		if library_flags["Pixelsurf"] and (isBindHeld or autoSurfAllowed) and moveOk and isInAir and val_872.alive and hrp and bv then
+			local wallPart, wallNormal, wallPos = findWallHitForSurf(); env.pixelSurfTouching = wallPart ~= nil
 			if wallPart and wallNormal then
 			    surfing = true 
 				if lastWallNormal and wallNormal:Dot(lastWallNormal) < 0.9 then
 					surfing = false; bv.MaxForce = Vector3.new(0, 0, 0); lastWallNormal = nil; env.pixelSurfTouching = false; return
 				end
-				lastWallNormal = wallNormal; local pspeed = library_flags["pspeed"] or 18; local moveDir = hum.MoveDirection; local horizNormal = Vector3.new(wallNormal.X, 0, wallNormal.Z).Unit; local vel = hrp.AssemblyLinearVelocity; local horizVel = Vector3.new(vel.X, 0, vel.Z); local glideDir = Vector3.new(0,0,0)
-				if moveDir.Magnitude > 0.1 then
-					local horizMove = Vector3.new(moveDir.X, 0, moveDir.Z).Unit; local projected = horizMove - horizNormal * horizMove:Dot(horizNormal)
-					if projected.Magnitude > 0.01 then
-						glideDir = projected.Unit
-					end
-				else
-					if horizVel.Magnitude > 1 then
-						local projected = horizVel.Unit - horizNormal * horizVel.Unit:Dot(horizNormal)
-						if projected.Magnitude > 0.01 then
-							glideDir = projected.Unit
-						end
-					end
-				end
-				bv.Velocity = Vector3.new(glideDir.X * pspeed, 0, glideDir.Z * pspeed); bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+				lastWallNormal = wallNormal
+				bv.Velocity = getPixelSurfGlideDir(hum, hrp, wallNormal); bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 			else
 				bv.MaxForce = Vector3.new(0, 0, 0); lastWallNormal = nil; env.pixelSurfTouching = false
 			end
@@ -9981,13 +11045,16 @@ env.runService.Heartbeat:Connect(function()
 		local inAir = (hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping or hum.FloorMaterial == Enum.Material.Air) and hum:GetState() ~= Enum.HumanoidStateType.Climbing
 		local vel = hrp.AssemblyLinearVelocity
 		if inAir and vel.Y < -5 then 
-			local wallPart, wallNormal, _ = findWallHit()
+			local wallPart, wallNormal, wallPos = findWallHitForSurf()
 			if wallPart and wallNormal then
 				if workspace.CurrentCamera.CFrame.LookVector:Dot(wallNormal) > 0.2 and not library_flags["Auto Align"] then
 					wallPart = nil
 				end
 				local uis = game:GetService("UserInputService")
-				if uis:IsKeyDown(Enum.KeyCode.S) or uis:IsKeyDown(Enum.KeyCode.A) or uis:IsKeyDown(Enum.KeyCode.D) or uis:IsKeyDown(Enum.KeyCode.LeftControl) or uis:IsKeyDown(Enum.KeyCode.C) then
+				local psMode = library_flags["Pixel Surf Mode"] or "All Walls"
+				if psMode ~= "Seams" and (uis:IsKeyDown(Enum.KeyCode.S) or uis:IsKeyDown(Enum.KeyCode.A) or uis:IsKeyDown(Enum.KeyCode.D) or uis:IsKeyDown(Enum.KeyCode.LeftControl) or uis:IsKeyDown(Enum.KeyCode.C)) then
+					wallPart = nil
+				elseif psMode == "Seams" and uis:IsKeyDown(Enum.KeyCode.S) then
 					wallPart = nil
 				end
 			end		
@@ -10015,17 +11082,7 @@ env.runService.Heartbeat:Connect(function()
 				end
 
 				if tick() - env.autoSurfStartTick <= 0.15 then
-					local horizNormal = Vector3.new(wallNormal.X, 0, wallNormal.Z).Unit
-					local horizVel = Vector3.new(vel.X, 0, vel.Z)
-					local glideDir = Vector3.new(0, 0, 0)
-					if horizVel.Magnitude > 1 then
-						local projected = horizVel.Unit - horizNormal * horizVel.Unit:Dot(horizNormal)
-						if projected.Magnitude > 0.01 then
-							glideDir = projected.Unit
-						end
-					end
-					local pspeed = library_flags["pspeed"] or 18
-					hrp.AssemblyLinearVelocity = Vector3.new(glideDir.X * pspeed, 0, glideDir.Z * pspeed)
+					hrp.AssemblyLinearVelocity = getPixelSurfGlideDir(hum, hrp, wallNormal)
 				else
 					env.autoSurfStartTick = nil
 					env.surfing = false
@@ -10299,10 +11356,30 @@ end)
 end)() 
 ;(function()
 	local RS = game:GetService("RunService"); local hitRemote = val_776; local localPlr = val_733; local players = val_711; local cam = val_749
-	RS.Heartbeat:Connect(function()
+	local rsWeapons = game:GetService("ReplicatedStorage"):FindFirstChild("Weapons")
+	local nanPos = {X = 0/0, Y = 0/0, Z = 0/0}
+	local killParts = {"HeadHB", "Head", "UpperTorso", "Torso", "HumanoidRootPart", "LowerTorso"}
+	local burstCount = 30
+	local function getKillTargets(char)
+		local hitboxes = char:FindFirstChild("Hitboxes")
+		local out, seen = {}, {}
+		for _, name in killParts do
+			local part = (hitboxes and hitboxes:FindFirstChild(name)) or char:FindFirstChild(name)
+			if part and part:IsA("BasePart") and not seen[part] then
+				seen[part] = true; out[#out + 1] = part
+			end
+		end
+		return out
+	end
+	local function fireKillHit(hitPart, gunName, gunRef, camPos, srvTime)
+		hitRemote:FireServer(
+			hitPart, nanPos, gunName, 4096, gunRef, nil, 1, false, true, camPos, srvTime, Vector3.new(0, 1, 0), true, true, true, true, true, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+		)
+	end
+	local function runAutoKill()
 		local loopKills = library_flags["PlayerLoopKills"]; local hasLoopKill = false
 		if loopKills then
-			for k, v in loopKills do
+			for _, v in loopKills do
 				if v then hasLoopKill = true; break end
 			end
 		end
@@ -10312,11 +11389,15 @@ end)()
 		if not char then return end
 		local hum = char:FindFirstChild("Humanoid")
 		if not hum or hum.Health <= 0 then return end
-		local gun = char:FindFirstChild("Gun"); local eqTool = char:FindFirstChild("EquippedTool")
-		if not gun or not eqTool then return end
-		local gunName = "AWP"; local gunRef = gun; local rsWeapons = game:GetService("ReplicatedStorage"):FindFirstChild("Weapons"); local awpFolder = rsWeapons and rsWeapons:FindFirstChild("AWP")
-		if awpFolder then gunRef = awpFolder end
-		local camPos = cam.CFrame.p; local srvTime = workspace:GetServerTimeNow(); local burstCount = 3; local nanBypass = true
+		local gun = char:FindFirstChild("Gun")
+		local gunRef = gun
+		if not gunRef and rsWeapons then
+			gunRef = rsWeapons:FindFirstChild("AWP") or rsWeapons:FindFirstChild("AK47") or rsWeapons:FindFirstChild("M4A4")
+		end
+		if not gunRef then return end
+		local eqTool = char:FindFirstChild("EquippedTool")
+		local gunName = (eqTool and eqTool.Value ~= "" and eqTool.Value) or "AWP"
+		local camPos = cam.CFrame.p; local srvTime = workspace:GetServerTimeNow()
 		for _, plr in players:GetPlayers() do
 			if plr == localPlr then continue end
 			local isLk = loopKills and loopKills[plr.Name]
@@ -10326,17 +11407,21 @@ end)()
 			end
 			local pChar = plr.Character
 			if not pChar then continue end
-			local hitboxes = pChar:FindFirstChild("Hitboxes"); local head = (hitboxes and hitboxes:FindFirstChild("HeadHB")) or pChar:FindFirstChild("HeadHB") or pChar:FindFirstChild("Head"); local pHum = pChar:FindFirstChild("Humanoid")
-			if not head or not pHum or pHum.Health <= 0 then continue end
-			for burst = 1, burstCount do
-				pcall(function()
-					local posArg = nanBypass and {X = 0/0, Y = 0/0, Z = 0/0} or encodePos(head.Position); hitRemote:FireServer(
-						head, posArg, gunName, 4096, gunRef, nil, 1, false, true, camPos, srvTime, Vector3.new(0, 1, 0), true, true, true, true, true, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
-					)
-				end)
+			local pHum = pChar:FindFirstChild("Humanoid")
+			if not pHum or pHum.Health <= 0 then continue end
+			local ff = pChar:FindFirstChildOfClass("ForceField")
+			if ff then pcall(function() ff:Destroy() end) end
+			local targets = getKillTargets(pChar)
+			if #targets == 0 then continue end
+			for _ = 1, burstCount do
+				for _, hitPart in targets do
+					pcall(fireKillHit, hitPart, gunName, gunRef, camPos, srvTime)
+				end
 			end
 		end
-	end)
+	end
+	RS.Heartbeat:Connect(runAutoKill)
+	RS.RenderStepped:Connect(runAutoKill)
 end)() 
 ;(function()
 WatermarkGui = Instance.new("ScreenGui"); WatermarkGui.Name = "NativeWatermark"; WatermarkGui.ResetOnSpawn = false; WatermarkGui.IgnoreGuiInset = true; WatermarkGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -11848,111 +12933,6 @@ spawn(function()
 end)
 
 env.playTick = playTick
-
-task.spawn(function()
-	local weatherEmitter = Instance.new("ParticleEmitter")
-	weatherEmitter.Name = "ClarityWeather"
-	weatherEmitter.EmissionDirection = Enum.NormalId.Bottom
-	weatherEmitter.Lifetime = NumberRange.new(2, 3)
-	weatherEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 0.1)})
-	weatherEmitter.Speed = NumberRange.new(50, 60)
-	weatherEmitter.SpreadAngle = Vector2.new(5, 5)
-	weatherEmitter.Rate = 0
-	weatherEmitter.Transparency = NumberSequence.new(0.5)
-	
-	local weatherPart = Instance.new("Part")
-	weatherPart.Name = "ClarityWeatherPart"
-	weatherPart.Transparency = 1
-	weatherPart.CanCollide = false
-	weatherPart.Anchored = true
-	weatherPart.Size = Vector3.new(150, 1, 150)
-	weatherEmitter.Parent = weatherPart
-	weatherPart.Parent = workspace.CurrentCamera
-
-	game:GetService("RunService").RenderStepped:Connect(function()
-		if workspace.CurrentCamera then
-			if weatherPart.Parent ~= workspace.CurrentCamera then
-				weatherPart.Parent = workspace.CurrentCamera
-			end
-			weatherPart.CFrame = workspace.CurrentCamera.CFrame * CFrame.new(0, 60, 0)
-		end
-		
-		local mode = library_flags["customWeather"] or "Default"
-		if mode == "Rain" then
-			weatherEmitter.Rate = 2500
-			weatherEmitter.Speed = NumberRange.new(80, 100)
-			weatherEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.05), NumberSequenceKeypoint.new(1, 0.05)})
-			weatherEmitter.Color = ColorSequence.new(Color3.fromRGB(150, 150, 255))
-			weatherEmitter.Texture = "rbxassetid://243660364" 
-		elseif mode == "Snow" then
-			weatherEmitter.Rate = 1000
-			weatherEmitter.Speed = NumberRange.new(15, 25)
-			weatherEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 0.2)})
-			weatherEmitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
-			weatherEmitter.Texture = "rbxassetid://152643521" 
-		else
-			weatherEmitter.Rate = 0
-		end
-	end)
-end)
-
-task.spawn(function()
-	while true do
-		task.wait(1)
-		pcall(function()
-			local doMats = library_flags["overrideMaterials"]
-			local matName = library_flags["overrideMaterialsType"] or "SmoothPlastic"
-			local matEnum = Enum.Material[matName] or Enum.Material.SmoothPlastic
-			local doTex = library_flags["removeTextures"]
-			local doPart = library_flags["removeMapParticles"]
-
-			for _, v in workspace:GetDescendants() do
-				if v:IsA("BasePart") then
-					if doMats and v.Parent.Name ~= "Terrain" and not v.Parent:FindFirstChild("Humanoid") and v.Name ~= "HumanoidRootPart" and v.Name ~= "Gun" then
-						if v.Material ~= matEnum then
-							if not v:GetAttribute("OriginalMaterial") then
-								v:SetAttribute("OriginalMaterial", v.Material.Name)
-							end
-							v.Material = matEnum
-						end
-					elseif not doMats and v:GetAttribute("OriginalMaterial") then
-						local origMat = v:GetAttribute("OriginalMaterial")
-						if v.Material.Name ~= origMat then
-							v.Material = Enum.Material[origMat] or Enum.Material.Plastic
-						end
-						v:SetAttribute("OriginalMaterial", nil)
-					end
-				end
-
-				if v:IsA("Decal") or v:IsA("Texture") then
-					if doTex then
-						if v.Transparency ~= 1 then
-							v:SetAttribute("OriginalTransparency", v.Transparency)
-							v.Transparency = 1
-						end
-					elseif not doTex and v:GetAttribute("OriginalTransparency") then
-						v.Transparency = v:GetAttribute("OriginalTransparency")
-						v:SetAttribute("OriginalTransparency", nil)
-					end
-				end
-
-				if v:IsA("ParticleEmitter") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
-					if doPart then
-						if v.Parent and v.Parent.Name ~= "Debris" and v.Parent.Name ~= "Ignore" and not v:IsDescendantOf(workspace.CurrentCamera) and not (v.Parent.Parent and v.Parent.Parent:FindFirstChild("Humanoid")) then
-							if v.Enabled then
-								v:SetAttribute("OriginalEnabled", v.Enabled)
-								v.Enabled = false
-							end
-						end
-					elseif not doPart and v:GetAttribute("OriginalEnabled") ~= nil then
-						v.Enabled = v:GetAttribute("OriginalEnabled")
-						v:SetAttribute("OriginalEnabled", nil)
-					end
-				end
-			end
-		end)
-	end
-end)
 
 
 	end
