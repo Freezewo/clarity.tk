@@ -206,10 +206,6 @@ local gameConfigs = {
 		placeIds = {138485390344924, 90184287580174},
 		url = "https://raw.githubusercontent.com/Freezewo/PoopHook/main/poophook.lua",
 	},
-	["blox strike"] = {
-		placeIds = {114234929420007},
-		url = "https://raw.githubusercontent.com/Freezewo/clarity.tk-BS/main/secret.lua",
-	},
 	["arsenal"] = {
 		placeIds = {286090429},
 		url = "https://raw.githubusercontent.com/Freezewo/awarehook/main/awarehook.lua",
@@ -227,7 +223,7 @@ for gameName, config in gameConfigs do
 	end
 end
 
-local games = {"counter blox", "killstreak", "blox strike", "arsenal"}
+local games = {"counter blox", "killstreak", "arsenal"}
 local gameButtons = {}
 
 for index, gameName in games do
@@ -315,7 +311,7 @@ injectBtn.MouseButton1Click:Connect(function()
 
 	showInit("initializing clarity")
 
-	if selectedGame == "blox strike" or game.PlaceId == 114234929420007 then
+	if selectedGame == " strike" or game.PlaceId == 114234929420007 then
 		pcall(function()
 			if debug and debug.info and hookfunction then
 				local old_debug_info
